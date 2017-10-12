@@ -48,10 +48,10 @@ void savePTM_LRGB(QString filename, int W, int H, QString chroma_img){
     int bias[6];
     char* files[6] = {"file.c1","file.c2","file.c3","file.c4","file.c5","file.c6"};
     float scale[6];
-    float* pBuff;
+    float* pBuff = new float[W*H];
     for (int i = 0; i <= 5; i++){
         ifstream coef (files[i], ios::in | ios::binary);
-        pBuff = new float[W*H];
+
         coef.read((char*)pBuff,W*H*sizeof(float));
         min[i] = 99999999999;
         max[i] = -99999999999;
@@ -64,7 +64,7 @@ void savePTM_LRGB(QString filename, int W, int H, QString chroma_img){
 
         scale[i]=(float) 1.0+floor((max[i]-min[i]-1)/256);
         bias[i]=(int)(-min[i]/scale[i]);// you can change this value
-        delete(pBuff);
+       // delete(pBuff);
         qDebug() <<"minmax "<<min[i]<< ' ' << max[i] <<'\n';
         qDebug() <<"scale "<<int(scale[i])<<'\n';
         qDebug() <<"bias "<<int(bias[i])<<'\n';
@@ -73,18 +73,19 @@ void savePTM_LRGB(QString filename, int W, int H, QString chroma_img){
 
     unsigned char* scaledc = new unsigned char[W*H*6];
     unsigned char test;
-    float testf;
+  //  float testf;
     for (int i = 0; i <= 5; i++){
+        qDebug(files[i]);
         ifstream coef (files[i], ios::in | ios::binary);
-        pBuff = new float[W*H];
+       // pBuff = new float[W*H];
         coef.read((char*)pBuff,W*H*sizeof(float));
         coef.close();
-
+/*
         test=(unsigned char)((pBuff[500*W+500]/scale[i])+(float)bias[i]);
 
         testf = (test-bias[i])*scale[i];
         qDebug() << i << " !!! " << pBuff[500*W+500] << " " << test << " " << testf;
-
+*/
         for (int x = 0;x<W; x++)
             for (int y = 0; y <H; y++)
             {
@@ -92,9 +93,10 @@ void savePTM_LRGB(QString filename, int W, int H, QString chroma_img){
             }
 
 
-        delete(pBuff);
+        //delete(pBuff);
 
     }
+    delete(pBuff);
 
     ofstream outfile;
     outfile.open(filename.toLatin1(),ios::binary);
@@ -119,6 +121,11 @@ void savePTM_LRGB(QString filename, int W, int H, QString chroma_img){
     cv::Mat image;
     image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
 
+    if(!image.data)
+{
+    outfile.close();
+return;
+}
     for (int y = H-1; y >=0; y--)
         for (int x = 0;x<W; x++)
             for (int i = 0; i < 6; i++)
