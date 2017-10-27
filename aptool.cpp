@@ -64,7 +64,7 @@ void savePTM_LRGB(QString filename, int W, int H, QString chroma_img){
 
         scale[i]=(float) 1.0+floor((max[i]-min[i]-1)/256);
         bias[i]=(int)(-min[i]/scale[i]);// you can change this value
-       // delete(pBuff);
+        // delete(pBuff);
         qDebug() <<"minmax "<<min[i]<< ' ' << max[i] <<'\n';
         qDebug() <<"scale "<<int(scale[i])<<'\n';
         qDebug() <<"bias "<<int(bias[i])<<'\n';
@@ -73,14 +73,14 @@ void savePTM_LRGB(QString filename, int W, int H, QString chroma_img){
 
     unsigned char* scaledc = new unsigned char[W*H*6];
     unsigned char test;
-  //  float testf;
+    //  float testf;
     for (int i = 0; i <= 5; i++){
         qDebug(files[i]);
         ifstream coef (files[i], ios::in | ios::binary);
-       // pBuff = new float[W*H];
+        // pBuff = new float[W*H];
         coef.read((char*)pBuff,W*H*sizeof(float));
         coef.close();
-/*
+        /*
         test=(unsigned char)((pBuff[500*W+500]/scale[i])+(float)bias[i]);
 
         testf = (test-bias[i])*scale[i];
@@ -122,10 +122,10 @@ void savePTM_LRGB(QString filename, int W, int H, QString chroma_img){
     image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
 
     if(!image.data)
-{
-    outfile.close();
-return;
-}
+    {
+        outfile.close();
+        return;
+    }
     for (int y = H-1; y >=0; y--)
         for (int x = 0;x<W; x++)
             for (int i = 0; i < 6; i++)
@@ -156,6 +156,125 @@ return;
     outfile.close();
 
 
+}
+
+
+void savePTM_RGB(QString filename, int W, int H){
+    //save the result in the RGB format
+
+    double max[6*3], min[6*3];
+    int bias[6];
+    char* files[6] = {"file.c1","file.c2","file.c3","file.c4","file.c5","file.c6"};
+    float scale[6*3];
+    float* pBuff = new float[3*W*H];
+
+   for (int i = 0; i <= 17; i++){
+    min[i] = 99999999999;
+    max[i] = -99999999999;
+}
+
+
+
+    for (int i = 0; i <= 5; i++){
+        ifstream coef (files[i], ios::in | ios::binary);
+    //for (int k=0; k<3; k++){
+        coef.read((char*)pBuff,3*W*H*sizeof(float));
+
+
+        for (int x= 0; x < 3*W*H; x++)
+        {
+            if(pBuff[x] > max[i]) max[i]=pBuff[x];
+            if(pBuff[x] < min[i]) min[i]=pBuff[x];
+         //   if(pBuff[x] > max[i*k+i]) max[i*k+i]=pBuff[x];
+         //   if(pBuff[x] < min[i*k+i]) min[i*k+i]=pBuff[x];
+        }
+
+      coef.close();
+        }
+
+      //  }
+
+ //  for (int k=0; k<3; k++){
+
+    for (int i = 0; i <= 5; i++){
+   scale[i]=(float) 1.0+floor((max[i]-min[i]-1)/256);
+        bias[i]=(int)(-min[i]/scale[i]);
+//        scale[i*k+i]=(float) 1.0+floor((max[i*k+i]-min[i*k+i]-1)/256);
+//        bias[i*k+i]=(int)(-min[i*k+i]/scale[i*k+i]);// you can change this value
+        // delete(pBuff);
+        qDebug() <<"minmax "<<min[i]<< ' ' << max[i] <<'\n';
+        qDebug() <<"scale "<<int(scale[i])<<'\n';
+        qDebug() <<"bias "<<int(bias[i])<<'\n';
+
+    }
+//}
+
+    unsigned char c;
+
+    unsigned char* scaledc = new unsigned char[W*H*6*3];
+    unsigned char test;
+      float testf;
+
+    for (int i = 0; i <= 5; i++){
+        ifstream coef (files[i], ios::in | ios::binary);
+        // pBuff = new float[W*H];
+        coef.read((char*)pBuff,3*W*H*sizeof(float));
+        coef.close();
+
+        //test=(unsigned char)((pBuff[50*W+500]/scale[i])+(float)bias[i]);
+
+        //testf = (test-bias[i])*scale[i];
+       // qDebug() << i << " !!! " << pBuff[50*W+50] << " " << test << " " << testf;
+
+        for(int k=0;k<3;k++)
+        for (int x = 0;x<W; x++)
+            for (int y = 0; y <H; y++)
+            {
+                scaledc[x+y*W+i*W*H+k*6*W*H] = (unsigned char)((pBuff[k*W*H+y*W+x]/scale[i])+(float)bias[i]);
+            }
+
+
+        //delete(pBuff);
+
+    }
+    delete(pBuff);
+
+
+
+    ofstream outfile;
+    outfile.open(filename.toLatin1(),ios::binary);
+    outfile <<  "PTM_1.2\n";
+    outfile <<  "PTM_FORMAT_RGB\n";
+    outfile << W <<"\n";
+    outfile << H <<"\n";
+    QString num;
+
+
+
+    for (int i = 0; i < 6; i++){
+        num=QString::number((float)scale[i]);
+        outfile << num.toStdString()<<" ";
+
+    } outfile <<'\n';
+
+
+    for (int i = 0; i < 6; i++){
+        num=QString::number((int)bias[i]);
+        outfile << num.toStdString()<<' ';
+    }outfile <<'\n';
+//}
+
+  //    for (int k=0; k<3; k++){
+
+for (int k=0; k<3; k++){
+    for (int y = H-1; y >=0; y--)
+        for (int x = 0;x<W; x++)
+            for (int i = 0; i < 6; i++)
+            {
+                c=scaledc[k*W*H*6+x+y*W+W*H*i] ;//scaledc[i].at<unsigned char>(x,y);
+                outfile.write(( char *)&c,1);
+            }
+}
 }
 
 
@@ -190,7 +309,7 @@ void apTool::on_processButton_clicked()
 
     QString filename = ui->fileNameLine->text();
     QFile file(filename);
-    int last= filename.lastIndexOf("/");
+    int last = filename.lastIndexOf(QDir::separator());
     QString folder=filename.left(last+1);
     qDebug() <<folder;
 
@@ -232,9 +351,19 @@ void apTool::on_processButton_clicked()
             type=2;
         }
 
+        if(parts[0]== "COLOR_TYPE" && parts[1]== "UNSIGNED_CHAR" ){
+            qDebug() << "COLOR UNSIGNED CHAR";
+            type=3;
+        }
+        if(parts[0]== "COLOR_TYPE" && parts[1]== "UNSIGNED_SHORT" ){
+            qDebug() << "COLOR UNSIGNED SHORT";
+            type=4;
+        }
+
+
         if(parts[0]== "CHROMA_IMAGE"  ){
             chroma_img = folder+parts[1];
-                    qDebug() << chroma_img;
+            qDebug() << chroma_img;
 
         }
 
@@ -345,6 +474,11 @@ void apTool::on_processButton_clicked()
     Mat outlim(size[1],size[0],CV_8UC3);
     Mat normals(size[1],size[0],CV_8UC3);
     Mat albedo(size[1],size[0],CV_8UC1);
+    Mat albedog(size[1],size[0],CV_8UC1);
+    Mat albedob(size[1],size[0],CV_8UC1);
+    std::vector<cv::Mat> albedos(3);
+   // Mat normals2(size[1],size[0],CV_8UC3);
+   // Mat normals3(size[1],size[0],CV_8UC3);
 
     Vec3f val;
     Vec3f dire;
@@ -352,6 +486,10 @@ void apTool::on_processButton_clicked()
 
     unsigned char* valc = new unsigned char[nimg];
     unsigned short* vals = new unsigned short[nimg];
+    unsigned char** colc = new unsigned char*[3];
+    for(int k=0; k<3; k++){
+        colc[k] = new unsigned char[nimg];
+    }
 
     Mat b_l,sol_l;
     Mat L_uv;
@@ -500,23 +638,8 @@ void apTool::on_processButton_clicked()
     vector<size_t> hl(nimg); //highlight
     vector<size_t> sh(nimg); //shadow
     vector<float> shd(nimg); //shadow
-      vector<size_t> idx(nimg);
+    vector<size_t> idx(nimg);
 
-    //int64 shmask[size[0]][size[1]];
-
-/*    QFile filer("file.rth");
-    if (!filer.open(QFile::WriteOnly | QFile::Text)) {
-        qDebug() << "error";
-    }
-    else{
-        QTextStream stream( &filer );
-        stream << "RTI\n";
-        stream << "TYPE PTM_LRGB\n";
-        stream << "CHROMA_IMG " << chroma_img << "\n";
-        stream << "SIZE " << size[0] << " " << size[1] << "\n";
-    }
-    filer.close();
-*/
 
     outcoef.open ("file.c1", ios::out | ios::binary);
     outcoef1.open ("file.c2", ios::out | ios::binary);
@@ -526,594 +649,1288 @@ void apTool::on_processButton_clicked()
     outcoef5.open ("file.c6", ios::out | ios::binary);
 
     // loop over APA pixel blocks
-    for(int j=0;j<size[1];j++)
-        for(int i=0;i<size[0];i++)
-        {
 
-//            shmask[i][j] = 0;
+    if(type <3)
+        for(int j=0;j<size[1];j++)
+            for(int i=0;i<size[0];i++)
+            {
 
-            if(dirtype==2) // interpolated dirs: estimate pixel-specific direction
-                for(int k=0;k<nimg;k++)
-                {
-                    dirs[k][0]=dircoeffs[k][0]*i+dircoeffs[k][1]*j+dircoeffs[k][2];
-                    dirs[k][1]=dircoeffs[k][3]*i+dircoeffs[k][4]*j+dircoeffs[k][5];
-                    dirs[k][2]=dircoeffs[k][6]*i+dircoeffs[k][7]*j+dircoeffs[k][8];
+                //            shmask[i][j] = 0;
 
-                    if(i==0 && j==0)
-                        qDebug() << " 0,0 - " << dirs[k][0] << " " << dirs[k][1] << " "  << dirs[k][2];
-                    if(i==size[0]-1 && j==size[1]-1)
-                        qDebug() << " end  - " << dirs[k][0] << " " << dirs[k][1] << " "  << dirs[k][2];
-                }
-            // 8 bit
-            if(type==1){
-                in.readRawData((char*)&valc[0], nimg);
-                vector<unsigned char> vec (&valc[0], &valc[0]+nimg );
-                int medi, mini, maxi;
-                vector<int> shad;
-                vector<int> shad2, tmpv;
-                //
+                if(dirtype==2) // interpolated dirs: estimate pixel-specific direction
+                    for(int k=0;k<nimg;k++)
+                    {
+                        dirs[k][0]=dircoeffs[k][0]*i+dircoeffs[k][1]*j+dircoeffs[k][2];
+                        dirs[k][1]=dircoeffs[k][3]*i+dircoeffs[k][4]*j+dircoeffs[k][5];
+                        dirs[k][2]=dircoeffs[k][6]*i+dircoeffs[k][7]*j+dircoeffs[k][8];
 
-                vector<int> inli;
+                        if(i==0 && j==0)
+                            qDebug() << " 0,0 - " << dirs[k][0] << " " << dirs[k][1] << " "  << dirs[k][2];
+                        if(i==size[0]-1 && j==size[1]-1)
+                            qDebug() << " end  - " << dirs[k][0] << " " << dirs[k][1] << " "  << dirs[k][2];
+                    }
+                // 8 bit
+                if(type==1){
+                    in.readRawData((char*)&valc[0], nimg);
+                    vector<unsigned char> vec (&valc[0], &valc[0]+nimg );
+                    int medi, mini, maxi;
+                    vector<int> shad;
+                    vector<int> shad2, tmpv;
+                    //
 
-                int out;
+                    vector<int> inli;
 
-
-
-                for (size_t p = 0; p != idx.size(); ++p) idx[p] = p;
-                sort (idx.begin (), idx.end (), compare_index<vector<unsigned char> &>(vec));
-                mini = idx[0];
-                maxi = idx[nimg-1];
-                if((vec.size()/2) % 2 == 0)
-                    medi = idx[(vec.size())/2 + 1];
-                else
-                    medi = idx[(vec.size())/2];
+                    int out;
 
 
-                nhi=0;
-                nsh=0;
-                for (int p = 0; p < idx.size(); p++) {
-                    hl[p]=il[p]=sh[p]=0;
-                    shd[p]=0;
-                    //   qDebug() << vec[idx[p]];
-                }
-                // highlights as saturated pixels?
-                for(int k=nimg-1; vec[idx[k]]>0.8*255; k--){nhi++;
-                    hl[idx[k]]=1;
-                }
 
-                for(int k=0;k<nimg;k++){
-
-                    int aa=0;
-                    float avgd=0, avgd2=0, avgv=0, avgv2=0;
+                    for (size_t p = 0; p != idx.size(); ++p) idx[p] = p;
+                    sort (idx.begin (), idx.end (), compare_index<vector<unsigned char> &>(vec));
+                    mini = idx[0];
+                    maxi = idx[nimg-1];
+                    if((vec.size()/2) % 2 == 0)
+                        medi = idx[(vec.size())/2 + 1];
+                    else
+                        medi = idx[(vec.size())/2];
 
 
-                    for(int p=0;p<nimg;p++){
-                        avgd2 += dp[p][k];
-                        avgv2 += sqrt(((float)vec[p]-(float)vec[k])*((float)vec[p]-(float)vec[k]));
+                    nhi=0;
+                    nsh=0;
+                    for (int p = 0; p < idx.size(); p++) {
+                        hl[p]=il[p]=sh[p]=0;
+                        shd[p]=0;
+                        //   qDebug() << vec[idx[p]];
+                    }
+                    // highlights as saturated pixels?
+                    for(int k=nimg-1; vec[idx[k]]>0.8*255; k--){nhi++;
+                        hl[idx[k]]=1;
                     }
 
+                    for(int k=0;k<nimg;k++){
 
-                    //  if(hl[k]==0)
-                    for(int p=0; p<neigh[k].size();p++){
-                        avgd += dp[neigh[k][p]][k];
-                        avgv += sqrt(((float)vec[neigh[k][p]]-(float)vec[k])*((float)vec[neigh[k][p]]-(float)vec[k]));
+                        int aa=0;
+                        float avgd=0, avgd2=0, avgv=0, avgv2=0;
 
-                        // detect shadows
 
-                        // ombra se vicino è più luminoso in modo doppio a quanto previsto dalla legge del sin elev
-                        // edit aggiungo minore della mediana
-
-                        if( vec[k] < vec[medi] &&
-                                (float)vec[neigh[k][p]]*sin(elev[k])/(sin(elev[neigh[k][p]])*(float)vec[k]) > 1.5){
-                            sh[k]=1; // c'è almeno un salto: è ombra
-
-                            shd[k]=shd[k]+1; // numero direzioni da cui è in ombra
-                            shad.push_back(k);
-                            //il[neigh[k][p]]=1;
-                            //inli.push_back(neigh[k][p]);
-                            // qDebug() << "?? " << vec[inds[k]] << " " << vec[inds[neigh[inds[k]][p]]];
-                            aa++;
+                        for(int p=0;p<nimg;p++){
+                            avgd2 += dp[p][k];
+                            avgv2 += sqrt(((float)vec[p]-(float)vec[k])*((float)vec[p]-(float)vec[k]));
                         }
+
+
+                        //  if(hl[k]==0)
+                        for(int p=0; p<neigh[k].size();p++){
+                            avgd += dp[neigh[k][p]][k];
+                            avgv += sqrt(((float)vec[neigh[k][p]]-(float)vec[k])*((float)vec[neigh[k][p]]-(float)vec[k]));
+
+                            // detect shadows
+
+                            // ombra se vicino è più luminoso in modo doppio a quanto previsto dalla legge del sin elev
+                            // edit aggiungo minore della mediana
+
+                            if( vec[k] < vec[medi] &&
+                                    (float)vec[neigh[k][p]]*sin(elev[k])/(sin(elev[neigh[k][p]])*(float)vec[k]) > 1.5){
+                                sh[k]=1; // c'è almeno un salto: è ombra
+
+                                shd[k]=shd[k]+1; // numero direzioni da cui è in ombra
+                                shad.push_back(k);
+                                //il[neigh[k][p]]=1;
+                                //inli.push_back(neigh[k][p]);
+                                // qDebug() << "?? " << vec[inds[k]] << " " << vec[inds[neigh[inds[k]][p]]];
+                                aa++;
+                            }
+                        }
+                        avgd2 /= nimg;
+                        avgd /=neigh[k].size();
+                        avgv2 /= nimg;
+                        avgv /=neigh[k].size();
+
+                        if(aa>0)
+                            nsh++;
                     }
-                    avgd2 /= nimg;
-                    avgd /=neigh[k].size();
-                    avgv2 /= nimg;
-                    avgv /=neigh[k].size();
 
-                    if(aa>0)
-                        nsh++;
-                }
+                    //qDebug() << "sh 1 -" << nsh;
+                    out =1;
 
-                //qDebug() << "sh 1 -" << nsh;
-                out =1;
+                    int k=0, ind;
 
-                int k=0, ind;
+                    for(int k=0;k<3;k++)
+                        val[k] = shd[0];
 
-                for(int k=0;k<3;k++)
-                    val[k] = shd[0];
-
-                test.at<Vec3b>(j,i) = val;
+                    test.at<Vec3b>(j,i) = val;
 
 
-            } // end 8 bit
-            // 16 bit
-            if(type==2){
+                } // end 8 bit
+                // 16 bit
+                if(type==2){
 
-                // read pixel data and do some processing. on this skeleton we can
-                // develop fitters, estimate normals, detect shadows and edges, etc.
+                    // read pixel data and do some processing. on this skeleton we can
+                    // develop fitters, estimate normals, detect shadows and edges, etc.
 
-                in.readRawData((char*)&vals[0], nimg*2);
-                vector<unsigned short> vec (&vals[0], &vals[0]+nimg );
-                int medi, mini, maxi;
-                vector<int> shad;
-                vector<int> shad2, tmpv;
-                vector<int> inli;
+                    in.readRawData((char*)&vals[0], nimg*2);
+                    vector<unsigned short> vec (&vals[0], &vals[0]+nimg );
+                    int medi, mini, maxi;
+                    vector<int> shad;
+                    vector<int> shad2, tmpv;
+                    vector<int> inli;
 
-                int out;
+                    int out;
 
 
 
-                for (size_t p = 0; p != idx.size(); ++p) idx[p] = p;
-                sort (idx.begin (), idx.end (), compare_index<vector<unsigned short> &>(vec));
+                    for (size_t p = 0; p != idx.size(); ++p) idx[p] = p;
+                    sort (idx.begin (), idx.end (), compare_index<vector<unsigned short> &>(vec));
 
-                mini = idx[0];
-                maxi = idx[nimg-1];
-                if((vec.size()/2) % 2 == 0)
-                    medi = idx[(vec.size())/2 + 1];
-                else
-                    medi = idx[(vec.size())/2];
-
-
-                nhi=0;
-                nsh=0;
-                for (int p = 0; p < idx.size(); p++) {
-                    hl[p]=il[p]=sh[p]=0;
-                    shd[p]=0;
-                    //   qDebug() << vec[idx[p]];
-                }
+                    mini = idx[0];
+                    maxi = idx[nimg-1];
+                    if((vec.size()/2) % 2 == 0)
+                        medi = idx[(vec.size())/2 + 1];
+                    else
+                        medi = idx[(vec.size())/2];
 
 
-                // highlights as saturated pixels?
-                for(int k=nimg-1; vec[idx[k]]>0.8*65535; k--){nhi++;
-                    hl[idx[k]]=1;
-                }
-
-#if 1
-                // test writing points and values
-
-                if(i==100 && j==100){
-
-                    QFile tfile("points.txt");
-                    if (!tfile.open(QFile::WriteOnly | QFile::Text)) {
-                        qDebug() << "error";
-                    }
-                    QTextStream tstream( &tfile );
-                    for(int k=0; k < nimg; k++)
-                        tstream << elev[k] << " " << azim[k] << " " << vec[k] << "\n";
-                    tfile.close();
-
-                    QFile tfile2("points2.txt");
-                    if (!tfile2.open(QFile::WriteOnly | QFile::Text)) {
-                        qDebug() << "error";
-                    }
-                    QTextStream tstream2( &tfile2 );
-                    for(int k=0; k < nimg; k++)
-                        tstream2 << xx[k] << " " << yy[k] << " " << vec[k] << "\n";
-                    tfile2.close();
-
-
-                    om.open ("meshc.obj");
-                    //     om << "COFF\n";
-                    //      om << nimg << " " << triads.size() << " " << "\n";
-
-                    float norml=65535;//vec[idx[0]];
-                    for(int ii=0;ii<nimg;ii++){
-                        om << "v " << elev[inds[ii]] << " " << azim[inds[ii]] << " 0.0 " << vec[inds[ii]]/norml << " " << vec[inds[ii]]/norml << " " << vec[inds[ii]]/norml << " \n";
-
+                    nhi=0;
+                    nsh=0;
+                    for (int p = 0; p < idx.size(); p++) {
+                        hl[p]=il[p]=sh[p]=0;
+                        shd[p]=0;
+                        //   qDebug() << vec[idx[p]];
                     }
 
 
-                    for( size_t i = 0; i < triads.size(); i++ )
-                    {
-                        //  om << "3 " << triads[i].a <<  " " << triads[i].b << " " << triads[i].c << endl;
-                        om << "f " << triads[i].a+1 <<  " " << triads[i].b+1 << " " << triads[i].c+1 << endl;
-
-                    }
-                    om.close();
-
-
-
-                    om.open ("meshc2.obj");
-
-                    for(int ii=0;ii<nimg;ii++){
-                        om << "v " << xx[indxx[ii]] << " " << yy[indxx[ii]] << " 0.0 " << vec[indxx[ii]]/norml << " " << vec[indxx[ii]]/norml << " " << vec[indxx[ii]]/norml << " \n";
-
+                    // highlights as saturated pixels?
+                    for(int k=nimg-1; vec[idx[k]]>0.8*65535; k--){nhi++;
+                        hl[idx[k]]=1;
                     }
 
+#if 0
+                    // test writing points and values
 
-                    for( size_t i = 0; i < triad2.size(); i++ )
-                    {
-                        om << "f " << triad2[i].a+1 <<  " " << triad2[i].b+1 << " " << triad2[i].c+1 << endl;
+                    if(i==100 && j==100){
+
+                        QFile tfile("points.txt");
+                        if (!tfile.open(QFile::WriteOnly | QFile::Text)) {
+                            qDebug() << "error";
+                        }
+                        QTextStream tstream( &tfile );
+                        for(int k=0; k < nimg; k++)
+                            tstream << elev[k] << " " << azim[k] << " " << vec[k] << "\n";
+                        tfile.close();
+
+                        QFile tfile2("points2.txt");
+                        if (!tfile2.open(QFile::WriteOnly | QFile::Text)) {
+                            qDebug() << "error";
+                        }
+                        QTextStream tstream2( &tfile2 );
+                        for(int k=0; k < nimg; k++)
+                            tstream2 << xx[k] << " " << yy[k] << " " << vec[k] << "\n";
+                        tfile2.close();
+
+
+                        om.open ("meshc.obj");
+                        //     om << "COFF\n";
+                        //      om << nimg << " " << triads.size() << " " << "\n";
+
+                        float norml=65535;//vec[idx[0]];
+                        for(int ii=0;ii<nimg;ii++){
+                            om << "v " << elev[inds[ii]] << " " << azim[inds[ii]] << " 0.0 " << vec[inds[ii]]/norml << " " << vec[inds[ii]]/norml << " " << vec[inds[ii]]/norml << " \n";
+
+                        }
+
+
+                        for( size_t i = 0; i < triads.size(); i++ )
+                        {
+                            //  om << "3 " << triads[i].a <<  " " << triads[i].b << " " << triads[i].c << endl;
+                            om << "f " << triads[i].a+1 <<  " " << triads[i].b+1 << " " << triads[i].c+1 << endl;
+
+                        }
+                        om.close();
+
+
+
+                        om.open ("meshc2.obj");
+
+                        for(int ii=0;ii<nimg;ii++){
+                            om << "v " << xx[indxx[ii]] << " " << yy[indxx[ii]] << " 0.0 " << vec[indxx[ii]]/norml << " " << vec[indxx[ii]]/norml << " " << vec[indxx[ii]]/norml << " \n";
+
+                        }
+
+
+                        for( size_t i = 0; i < triad2.size(); i++ )
+                        {
+                            om << "f " << triad2[i].a+1 <<  " " << triad2[i].b+1 << " " << triad2[i].c+1 << endl;
+
+                        }
+                        om.close();
+
 
                     }
-                    om.close();
-
-
-                }
 #endif
 
-                for(int k=0;k<nimg;k++){
+                    for(int k=0;k<nimg;k++){
 
-                    int aa=0;
-                    float avgd=0, avgd2=0, avgv=0, avgv2=0;
-
-
-                    for(int p=0;p<nimg;p++){
-                        avgd2 += dp[p][k];
-                        avgv2 += sqrt(((float)vec[p]-(float)vec[k])*((float)vec[p]-(float)vec[k]));
-                    }
+                        int aa=0;
+                        float avgd=0, avgd2=0, avgv=0, avgv2=0;
 
 
-                    //  if(hl[k]==0)
-                    for(int p=0; p<neigh[k].size();p++){
-                        avgd += dp[neigh[k][p]][k];
-                        avgv += sqrt(((float)vec[neigh[k][p]]-(float)vec[k])*((float)vec[neigh[k][p]]-(float)vec[k]));
-
-                        // detect shadows
-
-                        // ombra se vicino è più luminoso in modo doppio a quanto previsto dalla legge del sin elev
-                        // edit aggiungo minore della mediana
-
-                        if( vec[k] < vec[medi] &&
-                                (float)vec[neigh[k][p]]*sin(elev[k])/(sin(elev[neigh[k][p]])*(float)vec[k]) > 3){
-                            sh[k]=1; // c'è almeno un salto: è ombra
-
-                            shd[k]=shd[k]+1; // numero direzioni da cui è in ombra
-                            shad.push_back(k);
-                            //il[neigh[k][p]]=1;
-                            //inli.push_back(neigh[k][p]);
-                            // qDebug() << "?? " << vec[inds[k]] << " " << vec[inds[neigh[inds[k]][p]]];
-                            aa++;
+                        for(int p=0;p<nimg;p++){
+                            avgd2 += dp[p][k];
+                            avgv2 += sqrt(((float)vec[p]-(float)vec[k])*((float)vec[p]-(float)vec[k]));
                         }
-                    }
-                    avgd2 /= nimg;
-                    avgd /=neigh[k].size();
-                    avgv2 /= nimg;
-                    avgv /=neigh[k].size();
 
-                    if(aa>0)
-                        nsh++;
-                }
 
-                //qDebug() << "sh 1 -" << nsh;
-                out =1;
+                        //  if(hl[k]==0)
+                        for(int p=0; p<neigh[k].size();p++){
+                            avgd += dp[neigh[k][p]][k];
+                            avgv += sqrt(((float)vec[neigh[k][p]]-(float)vec[k])*((float)vec[neigh[k][p]]-(float)vec[k]));
 
-                int k=0, ind;
+                            // detect shadows
 
-                if(0)
-                    while(!shad.empty()) {
-                        ind=shad.back();
-                        shad.pop_back();
-                        for(int p=0; p<neigh[shad[k]].size();p++)
-                            if(hl[neigh[shad[k]][p]]==0 && il[neigh[shad[k]][p]]==0 && sh[neigh[shad[k]][p]]==0){
-                                shad2.push_back(neigh[shad[k]][p]);
-                                sh[neigh[shad[k]][p]]=1;
-                                nsh++;
+                            // ombra se vicino è più luminoso in modo doppio a quanto previsto dalla legge del sin elev
+                            // edit aggiungo minore della mediana
+
+                            if( vec[k] < vec[medi] &&
+                                    (float)vec[neigh[k][p]]*sin(elev[k])/(sin(elev[neigh[k][p]])*(float)vec[k]) > 3){
+                                sh[k]=1; // c'è almeno un salto: è ombra
+
+                                shd[k]=shd[k]+1; // numero direzioni da cui è in ombra
+                                shad.push_back(k);
+                                //il[neigh[k][p]]=1;
+                                //inli.push_back(neigh[k][p]);
+                                // qDebug() << "?? " << vec[inds[k]] << " " << vec[inds[neigh[inds[k]][p]]];
+                                aa++;
                             }
-                        tmpv=shad;
-                        shad=shad2;
-                        shad2=tmpv;
-                    }
-
-                //qDebug() << "sh 2 -" << nsh;
-
-
-
-                for(int k=0;k<3;k++)
-                    val[k] = shd[0];
-
-                test.at<Vec3b>(j,i) = val;
-            }
-            // end if depth 16
-
-            int l=0,ninl=0;
-
-            // fit full set
-    if(ui->robustMenu->currentIndex()==0 ){ // full set
-            if( ui->fitterMenu->currentIndex()==0 || ui->fitterMenu->currentIndex()==2) {
-                L_uv=Mat::zeros(nimg,6,DataType<float>::type);
-                b_l=Mat::zeros(nimg,1,CV_32FC1);
-            }
-
-            if(ui->fitterMenu->currentIndex()==1){//PS
-                L_uv=Mat::zeros(nimg,3,DataType<float>::type);
-                b_l=Mat::zeros(nimg,1,CV_32FC1);
-            }
-
-            if(ui->fitterMenu->currentIndex()==0) {// standard PTM
-
-                for (int k=0; k<nimg;k++){
-                    L_uv.at<float>(k,0)=pow( dirs[k][0] ,2);
-                    L_uv.at<float>(k,1)=pow( dirs[k][1],2);
-                    L_uv.at<float>(k,2)=(dirs[k][0] * dirs[k][1]);
-                    L_uv.at<float>(k,3)=dirs[k][0];
-                    L_uv.at<float>(k,4)=dirs[k][1];
-                    L_uv.at<float>(k,5)=1;
-                    if(type==2)
-                    b_l.at<float>(k)= vals[k]/256.0;
-                    else if(type==1)
-                            b_l.at<float>(k)= (float)valc[k];
-
-                }
-            }
-            if(ui->fitterMenu->currentIndex()==2) {// Drews PTM
-
-                for (int k=0; k<nimg;k++){
-                    L_uv.at<float>(k,0)=dirs[k][0];
-                    L_uv.at<float>(k,1)=dirs[k][1];
-                    L_uv.at<float>(k,2)=dirs[k][2];
-                    L_uv.at<float>(k,3)=pow( dirs[k][0] ,2);
-                    L_uv.at<float>(k,4)=(dirs[k][0] * dirs[k][1]);
-                    L_uv.at<float>(k,5)=1;
-
-                    if(type==2)
-                    b_l.at<float>(k)= vals[k]/256.0;
-                    else if(type==1)
-                            b_l.at<float>(k)= (float)valc[k];
-                }
-            }
-            if(ui->fitterMenu->currentIndex()==1) {// PS
-
-                for (int k=0; k<nimg;k++){
-                    L_uv.at<float>(k,0)=dirs[k][0];
-                    L_uv.at<float>(k,1)=dirs[k][1];
-                    L_uv.at<float>(k,2)=dirs[k][2];
-
-                    if(type==2)
-                    b_l.at<float>(k)= vals[k]/256.0;
-                    else if(type==1)
-                            b_l.at<float>(k)= (float)valc[k];
-                }
-            }
-
-} else if( ui->robustMenu->currentIndex()==1 ){  // trimmed fit
-                ninl=nimg-8;
-             //   for (int k=0; k<nimg;k++)
-               //     if(shd[k]==0) ninl=ninl+1;
-
-
-              
-              //  idx[0];
-
-                if( ui->fitterMenu->currentIndex()==0 || ui->fitterMenu->currentIndex()==2) {
-                    L_uv=Mat::zeros(ninl,6,DataType<float>::type);
-                    b_l=Mat::zeros(ninl,1,CV_32FC1);
-                }
-
-                if(ui->fitterMenu->currentIndex()==1){//PS
-                    L_uv=Mat::zeros(ninl,3,DataType<float>::type);
-                    b_l=Mat::zeros(ninl,1,CV_32FC1);
-                }
-
-                if(ui->fitterMenu->currentIndex()==0) {// standard PTM
-                    int k=0;   
-                    for (int p=0; p<nimg;p++)
-                        if(idx[p] >3 && idx[p] < nimg-4 )
-                    {                        
-                        L_uv.at<float>(k,0)=pow( dirs[k][0] ,2);
-                        L_uv.at<float>(k,1)=pow( dirs[k][1],2);
-                        L_uv.at<float>(k,2)=(dirs[k][0] * dirs[k][1]);
-                        L_uv.at<float>(k,3)=dirs[k][0];
-                        L_uv.at<float>(k,4)=dirs[k][1];
-                        L_uv.at<float>(k,5)=1;
-                        if(type==2)
-                        b_l.at<float>(k)= vals[k]/256.0;
-                        else if(type==1)
-                                b_l.at<float>(k)= (float)valc[k];
-                        k=k+1;
-
-                    }
-                }
-                if(ui->fitterMenu->currentIndex()==2) {// Drews PTM
-
-                    int k=0;   
-                    for (int p=0; p<nimg;p++)
-                         if(idx[p] >3 && idx[p] < nimg-4 ){
-                        L_uv.at<float>(k,0)=dirs[k][0];
-                        L_uv.at<float>(k,1)=dirs[k][1];
-                        L_uv.at<float>(k,2)=dirs[k][2];
-                        L_uv.at<float>(k,3)=pow( dirs[k][0] ,2);
-                        L_uv.at<float>(k,4)=(dirs[k][0] * dirs[k][1]);
-                        L_uv.at<float>(k,5)=1;
-
-                        if(type==2)
-                        b_l.at<float>(k)= vals[k]/256.0;
-                        else if(type==1)
-                                b_l.at<float>(k)= (float)valc[k];
-                        k=k+1;
                         }
+                        avgd2 /= nimg;
+                        avgd /=neigh[k].size();
+                        avgv2 /= nimg;
+                        avgv /=neigh[k].size();
+
+                        if(aa>0)
+                            nsh++;
+                    }
+
+                    //qDebug() << "sh 1 -" << nsh;
+                    out =1;
+
+                    int k=0, ind;
+
+                    if(0)
+                        while(!shad.empty()) {
+                            ind=shad.back();
+                            shad.pop_back();
+                            for(int p=0; p<neigh[shad[k]].size();p++)
+                                if(hl[neigh[shad[k]][p]]==0 && il[neigh[shad[k]][p]]==0 && sh[neigh[shad[k]][p]]==0){
+                                    shad2.push_back(neigh[shad[k]][p]);
+                                    sh[neigh[shad[k]][p]]=1;
+                                    nsh++;
+                                }
+                            tmpv=shad;
+                            shad=shad2;
+                            shad2=tmpv;
+                        }
+
+                    //qDebug() << "sh 2 -" << nsh;
+
+
+
+                    for(int k=0;k<3;k++)
+                        val[k] = shd[0];
+
+                    test.at<Vec3b>(j,i) = val;
                 }
-                if(ui->fitterMenu->currentIndex()==1) {// PS
+                // end if depth 16
 
-                    int k=0;   
-                    for (int p=0; p<nimg;p++)
-                         if(idx[p] >3 && idx[p] < nimg-4 ){
-                        L_uv.at<float>(k,0)=dirs[k][0];
-                        L_uv.at<float>(k,1)=dirs[k][1];
-                        L_uv.at<float>(k,2)=dirs[k][2];
 
-                        if(type==2)
-                        b_l.at<float>(k)= vals[k]/256.0;
-                        else if(type==1)
+                int l=0,ninl=0;
+
+                // fit full set
+                if(ui->robustMenu->currentIndex()==0 ){ // full set
+                    if( ui->fitterMenu->currentIndex()==0 || ui->fitterMenu->currentIndex()==2) {
+                        L_uv=Mat::zeros(nimg,6,DataType<float>::type);
+                        b_l=Mat::zeros(nimg,1,CV_32FC1);
+                    }
+
+                    if(ui->fitterMenu->currentIndex()==1){//PS
+                        L_uv=Mat::zeros(nimg,3,DataType<float>::type);
+                        b_l=Mat::zeros(nimg,1,CV_32FC1);
+                    }
+
+                    if(ui->fitterMenu->currentIndex()==0) {// standard PTM
+
+                        for (int k=0; k<nimg;k++){
+                            L_uv.at<float>(k,0)=pow( dirs[k][0] ,2);
+                            L_uv.at<float>(k,1)=pow( dirs[k][1],2);
+                            L_uv.at<float>(k,2)=(dirs[k][0] * dirs[k][1]);
+                            L_uv.at<float>(k,3)=dirs[k][0];
+                            L_uv.at<float>(k,4)=dirs[k][1];
+                            L_uv.at<float>(k,5)=1;
+                            if(type==2)
+                                b_l.at<float>(k)= vals[k]/256.0;
+                            else if(type==1)
                                 b_l.at<float>(k)= (float)valc[k];
-                        k=k+1;
+
+                        }
                     }
+                    if(ui->fitterMenu->currentIndex()==2) {// Drews PTM
+
+                        for (int k=0; k<nimg;k++){
+                            L_uv.at<float>(k,0)=dirs[k][0];
+                            L_uv.at<float>(k,1)=dirs[k][1];
+                            L_uv.at<float>(k,2)=dirs[k][2];
+                            L_uv.at<float>(k,3)=pow( dirs[k][0] ,2);
+                            L_uv.at<float>(k,4)=(dirs[k][0] * dirs[k][1]);
+                            L_uv.at<float>(k,5)=1;
+
+                            if(type==2)
+                                b_l.at<float>(k)= vals[k]/256.0;
+                            else if(type==1)
+                                b_l.at<float>(k)= (float)valc[k];
+                        }
+                    }
+                    if(ui->fitterMenu->currentIndex()==1) {// PS
+
+                        for (int k=0; k<nimg;k++){
+
+
+                            L_uv.at<float>(k,0)=dirs[k][0];
+                            L_uv.at<float>(k,1)=dirs[k][1];
+                            L_uv.at<float>(k,2)=dirs[k][2];
+
+                            if(type==2)
+                                b_l.at<float>(k)= vals[k]/256.0;
+                            else if(type==1)
+                                b_l.at<float>(k)= (float)valc[k];
+                        }
+                    }
+
+                } else if( ui->robustMenu->currentIndex()==1 ){
+                    qDebug() << "Trimmed";
+                    // trimmed fit
+                    ninl=nimg-8;
+                    //   for (int k=0; k<nimg;k++)
+                    //     if(shd[k]==0) ninl=ninl+1;
+
+
+
+                    //  idx[0];
+
+                    if( ui->fitterMenu->currentIndex()==0 || ui->fitterMenu->currentIndex()==2) {
+                        L_uv=Mat::zeros(ninl,6,DataType<float>::type);
+                        b_l=Mat::zeros(ninl,1,CV_32FC1);
+                    }
+
+                    if(ui->fitterMenu->currentIndex()==1){//PS
+                        L_uv=Mat::zeros(ninl,3,DataType<float>::type);
+                        b_l=Mat::zeros(ninl,1,CV_32FC1);
+                    }
+
+                    if(ui->fitterMenu->currentIndex()==0) {// standard PTM
+                        int k=0;
+                        for (int p=0; p<nimg;p++)
+                            if(idx[p] >3 && idx[p] < nimg-4 )
+                            {
+                                L_uv.at<float>(k,0)=pow( dirs[k][0] ,2);
+                                L_uv.at<float>(k,1)=pow( dirs[k][1],2);
+                                L_uv.at<float>(k,2)=(dirs[k][0] * dirs[k][1]);
+                                L_uv.at<float>(k,3)=dirs[k][0];
+                                L_uv.at<float>(k,4)=dirs[k][1];
+                                L_uv.at<float>(k,5)=1;
+                                if(type==2)
+                                    b_l.at<float>(k)= vals[k]/256.0;
+                                else if(type==1)
+                                    b_l.at<float>(k)= (float)valc[k];
+                                k=k+1;
+
+                            }
+                    }
+                    if(ui->fitterMenu->currentIndex()==2) {// Drews PTM
+
+                        int k=0;
+                        for (int p=0; p<nimg;p++)
+                            if(idx[p] >3 && idx[p] < nimg-4 ){
+                                L_uv.at<float>(k,0)=dirs[k][0];
+                                L_uv.at<float>(k,1)=dirs[k][1];
+                                L_uv.at<float>(k,2)=dirs[k][2];
+                                L_uv.at<float>(k,3)=pow( dirs[k][0] ,2);
+                                L_uv.at<float>(k,4)=(dirs[k][0] * dirs[k][1]);
+                                L_uv.at<float>(k,5)=1;
+
+                                if(type==2)
+                                    b_l.at<float>(k)= vals[k]/256.0;
+                                else if(type==1)
+                                    b_l.at<float>(k)= (float)valc[k];
+                                k=k+1;
+                            }
+                    }
+                    if(ui->fitterMenu->currentIndex()==1) {// PS
+
+                        int k=0;
+                        for (int p=0; p<nimg;p++)
+                            if(idx[p] >3 && idx[p] < nimg-4 ){
+                                L_uv.at<float>(k,0)=dirs[k][0];
+                                L_uv.at<float>(k,1)=dirs[k][1];
+                                L_uv.at<float>(k,2)=dirs[k][2];
+
+                                if(type==2)
+                                    b_l.at<float>(k)= vals[k]/256.0;
+                                else if(type==1)
+                                    b_l.at<float>(k)= (float)valc[k];
+                                k=k+1;
+                            }
+                    }
+
+
                 }
 
 
-            }
 
+                solve(L_uv, b_l, sol_l, DECOMP_SVD);
+                L_uv.release();
+                b_l.release();
 
-            solve(L_uv, b_l, sol_l, DECOMP_SVD);
-            L_uv.release();
-            b_l.release();
-
-            if(ui->fitterMenu->currentIndex()==0 || ui->fitterMenu->currentIndex()==2) {// PTM
-                for (int k=0;k<6;k++){
-                    if (cvIsNaN(sol_l.at<float>(k))==1){
-                        sol_l.at<float>(k)=0;
+                if(ui->fitterMenu->currentIndex()==0 || ui->fitterMenu->currentIndex()==2) {// PTM
+                    for (int k=0;k<6;k++){
+                        if (cvIsNaN(sol_l.at<float>(k))==1){
+                            sol_l.at<float>(k)=0;
+                        }
+                       // else
+                          //  sol_l.at<float>(k)=sol_l.at<float>(k);??
                     }
-                    else
-                        sol_l.at<float>(k)=sol_l.at<float>(k);
+
+                    outcoef.write((char*)&sol_l.at<float>(0),sizeof(float));
+                    outcoef1.write((char*)&sol_l.at<float>(1),sizeof(float));
+                    outcoef2.write((char*)&sol_l.at<float>(2),sizeof(float));
+                    outcoef3.write((char*)&sol_l.at<float>(3),sizeof(float));
+                    outcoef4.write((char*)&sol_l.at<float>(4),sizeof(float));
+                    outcoef5.write((char*)&sol_l.at<float>(5),sizeof(float));
+
+                    albedo.at<unsigned char>(j,i) = (unsigned char)sol_l.at<float>(5);
+
+                    float speck=0, shy=0, she=0, stand=0;
+                    float diffe,thr;
+                    for (int k=0; k<nimg;k++){
+                        if(type==2)
+                            diffe= vals[k]/256.0;
+                        else
+                            diffe = valc[k];
+
+                        she = she+4*sh[k];
+
+                        // 12
+
+                        thr= 12;
+
+
+                        if(ui->fitterMenu->currentIndex()==0)
+                            diffe = diffe-(sol_l.at<float>(0)*pow( dirs[k][0] ,2)
+                                    +sol_l.at<float>(1)*pow( dirs[k][1],2)
+                                    +sol_l.at<float>(2)*(dirs[k][0] * dirs[k][1])
+                                    +sol_l.at<float>(3)*dirs[k][0]
+                                    +sol_l.at<float>(4)*dirs[k][1]
+                                    +sol_l.at<float>(5));
+                        else
+                            diffe = diffe-(sol_l.at<float>(0)*dirs[k][0]
+                                    +sol_l.at<float>(1)*dirs[k][1]
+                                    +sol_l.at<float>(2)*dirs[k][2]
+                                    +sol_l.at<float>(3)*pow( dirs[k][0] ,2)
+                                    +sol_l.at<float>(4)*(dirs[k][0] * dirs[k][1])
+                                    +sol_l.at<float>(5));
+
+
+                        stand=stand+diffe*diffe;
+
+
+                        if(diffe>thr)
+                            speck=speck+4;
+                        if(diffe<-thr)
+                            shy=shy+4;
+
+                    }
+                    for(int k=0;k<3;k++)
+                        val[k]=speck;
+                    him.at<Vec3b>(j,i)= val;
+                    for(int k=0;k<3;k++)
+                        val[k]=shy;
+                    shim.at<Vec3b>(j,i)= val;
+
+
+                    for(int k=0;k<3;k++)
+                        val[k]=25*sqrt(stand)/nimg;
+
+                    test.at<Vec3b>(j,i)= val;
+
+                    for(int k=0;k<3;k++)
+                        val[k]=speck+shy;
+
+                    outlim.at<Vec3b>(j,i)= val;
+
                 }
+                else if(ui->fitterMenu->currentIndex()==1){ //PS
 
-                outcoef.write((char*)&sol_l.at<float>(0),sizeof(float));
-                outcoef1.write((char*)&sol_l.at<float>(1),sizeof(float));
-                outcoef2.write((char*)&sol_l.at<float>(2),sizeof(float));
-                outcoef3.write((char*)&sol_l.at<float>(3),sizeof(float));
-                outcoef4.write((char*)&sol_l.at<float>(4),sizeof(float));
-                outcoef5.write((char*)&sol_l.at<float>(5),sizeof(float));
+                    outcoef.write((char*)&sol_l.at<float>(0),sizeof(float));
+                    outcoef1.write((char*)&sol_l.at<float>(1),sizeof(float));
+                    outcoef2.write((char*)&sol_l.at<float>(2),sizeof(float));
 
-                albedo.at<unsigned char>(j,i) = (unsigned char)sol_l.at<float>(5);
-
-                float speck=0, shy=0, she=0, stand=0;
-                float diffe,thr;
-              for (int k=0; k<nimg;k++){
-                  if(type==2)
-                   diffe= vals[k]/256.0;
-                  else
-                   diffe = valc[k];
-
-                  she = she+4*sh[k];
-
-                  // 12
-
-                  thr= 12;
+                    float nf = sqrt(sol_l.at<float>(0)*sol_l.at<float>(0)+sol_l.at<float>(1)*sol_l.at<float>(1)+sol_l.at<float>(2)*sol_l.at<float>(2));
 
 
-                  if(ui->fitterMenu->currentIndex()==0)
-                  diffe = diffe-(sol_l.at<float>(0)*pow( dirs[k][0] ,2)
-                         +sol_l.at<float>(1)*pow( dirs[k][1],2)
-                         +sol_l.at<float>(2)*(dirs[k][0] * dirs[k][1])
-                         +sol_l.at<float>(3)*dirs[k][0]
-                         +sol_l.at<float>(4)*dirs[k][1]
-                         +sol_l.at<float>(5));
-                  else
-                      diffe = diffe-(sol_l.at<float>(0)*dirs[k][0]
-                             +sol_l.at<float>(1)*dirs[k][1]
-                             +sol_l.at<float>(2)*dirs[k][2]
-                             +sol_l.at<float>(3)*pow( dirs[k][0] ,2)
-                             +sol_l.at<float>(4)*(dirs[k][0] * dirs[k][1])
-                             +sol_l.at<float>(5));
+                    for(int k=0;k<3;k++)
+                        val[2-k] = 255*0.5*(1+sol_l.at<float>(k)/nf);
+
+                    normals.at<Vec3b>(j,i) = val;
+                    albedo.at<unsigned char>(j,i) = 0.6*nf;
 
 
-                  stand=stand+diffe*diffe;
+                    // estimating features
+                    float speck=0, shy=0, she=0, stand=0;
+                    float diffe,thr;
 
+                    for (int k=0; k<nimg;k++){
+                        if(type==2)
+                            diffe= vals[k]/256.0;
+                        else
+                            diffe = valc[k];
 
-                   if(diffe>thr)
-                  speck=speck+4;
-                   if(diffe<-thr)
-                  shy=shy+4;
+                        she = she+4*sh[k];
 
-              }
-              for(int k=0;k<3;k++)
-                  val[k]=speck;
-              him.at<Vec3b>(j,i)= val;
-               for(int k=0;k<3;k++)
-              val[k]=shy;
-                shim.at<Vec3b>(j,i)= val;
-
-
-              for(int k=0;k<3;k++)
-                 val[k]=25*sqrt(stand)/nimg;
-
-             test.at<Vec3b>(j,i)= val;
-
-             for(int k=0;k<3;k++)
-                val[k]=speck+shy;
-
-             outlim.at<Vec3b>(j,i)= val;
-
-            }
-            else if(ui->fitterMenu->currentIndex()==1){
-
-                outcoef.write((char*)&sol_l.at<float>(0),sizeof(float));
-                outcoef1.write((char*)&sol_l.at<float>(1),sizeof(float));
-                outcoef2.write((char*)&sol_l.at<float>(2),sizeof(float));
-
-                float nf = sqrt(sol_l.at<float>(0)*sol_l.at<float>(0)+sol_l.at<float>(1)*sol_l.at<float>(1)+sol_l.at<float>(2)*sol_l.at<float>(2));
-
-
-                for(int k=0;k<3;k++)
-                    val[2-k] = 255*0.5*(1+sol_l.at<float>(k)/nf);
-
-                normals.at<Vec3b>(j,i) = val;
-                albedo.at<unsigned char>(j,i) = 0.6*nf;
-
-
-                // estimating features
-                float speck=0, shy=0, she=0, stand=0;
-                float diffe,thr;
-
-                for (int k=0; k<nimg;k++){
-                  if(type==2)
-                   diffe= vals[k]/256.0;
-                  else
-                   diffe = valc[k];
-
-                  she = she+4*sh[k];
-
-                  thr=12;
-                    /*thr= 0.1*(sol_l.at<float>(0)*dirs[k][0]
+                        thr=12;
+                        /*thr= 0.1*(sol_l.at<float>(0)*dirs[k][0]
                             +sol_l.at<float>(1)*dirs[k][1]
                             +sol_l.at<float>(2)*dirs[k][2]);*/
 
-                  diffe = diffe-(sol_l.at<float>(0)*dirs[k][0]
-                         +sol_l.at<float>(1)*dirs[k][1]
-                         +sol_l.at<float>(2)*dirs[k][2]);
+                        diffe = diffe-(sol_l.at<float>(0)*dirs[k][0]
+                                +sol_l.at<float>(1)*dirs[k][1]
+                                +sol_l.at<float>(2)*dirs[k][2]);
 
-                  stand=stand+diffe*diffe;
+                        stand=stand+diffe*diffe;
 
 
-                   if(diffe>thr)
-                  speck=speck+4;
-                   if(diffe<-thr)
-                  shy=shy+4;
+                        if(diffe>thr)
+                            speck=speck+4;
+                        if(diffe<-thr)
+                            shy=shy+4;
 
-              }
-              for(int k=0;k<3;k++)
-                  val[k]=speck;
-              him.at<Vec3b>(j,i)= val;
-               for(int k=0;k<3;k++)
-              val[k]=shy;
-                shim.at<Vec3b>(j,i)= val;
+                    }
+                    for(int k=0;k<3;k++)
+                        val[k]=speck;
+                    him.at<Vec3b>(j,i)= val;
+                    for(int k=0;k<3;k++)
+                        val[k]=shy;
+                    shim.at<Vec3b>(j,i)= val;
 
-              for(int k=0;k<3;k++)
-                val[k]=20*sqrt(stand)/nimg;
+                    for(int k=0;k<3;k++)
+                        val[k]=20*sqrt(stand)/nimg;
 
-             test.at<Vec3b>(j,i)= val;
+                    test.at<Vec3b>(j,i)= val;
 
-             for(int k=0;k<3;k++)
-                val[k]=speck+shy;
+                    for(int k=0;k<3;k++)
+                        val[k]=speck+shy;
 
-             outlim.at<Vec3b>(j,i)= val;
+                    outlim.at<Vec3b>(j,i)= val;
+
+                }
+
+                if(ui->fitterMenu->currentIndex()==2){
+                    float nf = sqrt(sol_l.at<float>(0)*sol_l.at<float>(0)+sol_l.at<float>(1)*sol_l.at<float>(1)+sol_l.at<float>(2)*sol_l.at<float>(2));
+
+                    for(int k=0;k<3;k++)
+                        val[2-k] = 255*0.5*(1+sol_l.at<float>(k)/nf);
+
+                    normals.at<Vec3b>(j,i) = val;
+                    albedo.at<unsigned char>(j,i) = 0.6*nf;
+                    //qDebug() << val[2] << " ----- " << albedo.at<unsigned char>(j,i);
+                }
+
+
 
             }
+    else{
+        // 8 bit RGB
+        if(type==3)
+            for(int cc=0; cc<3;cc++) { // loop over colors
+                for(int j=0;j<size[1];j++)
+                    for(int i=0;i<size[0];i++)
+                    {
+                        if(dirtype==2) // interpolated dirs: estimate pixel-specific direction
+                            for(int k=0;k<nimg;k++)
+                            {
+                                dirs[k][0]=dircoeffs[k][0]*i+dircoeffs[k][1]*j+dircoeffs[k][2];
+                                dirs[k][1]=dircoeffs[k][3]*i+dircoeffs[k][4]*j+dircoeffs[k][5];
+                                dirs[k][2]=dircoeffs[k][6]*i+dircoeffs[k][7]*j+dircoeffs[k][8];
+                            }
 
-            if(ui->fitterMenu->currentIndex()==2){
-                float nf = sqrt(sol_l.at<float>(0)*sol_l.at<float>(0)+sol_l.at<float>(1)*sol_l.at<float>(1)+sol_l.at<float>(2)*sol_l.at<float>(2));
+                        in.readRawData((char*)&valc[0], nimg);
+                        vector<unsigned char> vec (&valc[0], &valc[0]+nimg );
 
-                for(int k=0;k<3;k++)
-                    val[2-k] = 255*0.5*(1+sol_l.at<float>(k)/nf);
+                        int l=0,ninl=0;
 
-                normals.at<Vec3b>(j,i) = val;
-                albedo.at<unsigned char>(j,i) = 0.6*nf;
-                //qDebug() << val[2] << " ----- " << albedo.at<unsigned char>(j,i);
+                        // fit full set
+                        if(ui->robustMenu->currentIndex()==0 ){ // full set
+                            if( ui->fitterMenu->currentIndex()==0 || ui->fitterMenu->currentIndex()==2) {
+                                L_uv=Mat::zeros(nimg,6,DataType<float>::type);
+                                b_l=Mat::zeros(nimg,1,CV_32FC1);
+                            }
+
+                            if(ui->fitterMenu->currentIndex()==1){//PS
+                                L_uv=Mat::zeros(nimg,3,DataType<float>::type);
+                                b_l=Mat::zeros(nimg,1,CV_32FC1);
+                            }
+
+                            if(ui->fitterMenu->currentIndex()==0) {// standard PTM
+
+                                for (int k=0; k<nimg;k++){
+                                    L_uv.at<float>(k,0)=pow( dirs[k][0] ,2);
+                                    L_uv.at<float>(k,1)=pow( dirs[k][1],2);
+                                    L_uv.at<float>(k,2)=(dirs[k][0] * dirs[k][1]);
+                                    L_uv.at<float>(k,3)=dirs[k][0];
+                                    L_uv.at<float>(k,4)=dirs[k][1];
+                                    L_uv.at<float>(k,5)=1;
+                                    if(type==4)
+                                        b_l.at<float>(k)= vals[k]/256.0;
+                                    else if(type==3)
+                                        b_l.at<float>(k)= (float)valc[k];
+
+                                }
+                            }
+                            if(ui->fitterMenu->currentIndex()==2) {// Drews PTM
+
+                                for (int k=0; k<nimg;k++){
+                                    L_uv.at<float>(k,0)=dirs[k][0];
+                                    L_uv.at<float>(k,1)=dirs[k][1];
+                                    L_uv.at<float>(k,2)=dirs[k][2];
+                                    L_uv.at<float>(k,3)=pow( dirs[k][0] ,2);
+                                    L_uv.at<float>(k,4)=(dirs[k][0] * dirs[k][1]);
+                                    L_uv.at<float>(k,5)=1;
+
+                                    if(type==4)
+                                        b_l.at<float>(k)= vals[k]/256.0;
+                                    else if(type==3)
+                                        b_l.at<float>(k)= (float)valc[k];
+                                }
+                            }
+                            if(ui->fitterMenu->currentIndex()==1) {// PS
+
+                                for (int k=0; k<nimg;k++){
+                                    L_uv.at<float>(k,0)=dirs[k][0];
+                                    L_uv.at<float>(k,1)=dirs[k][1];
+                                    L_uv.at<float>(k,2)=dirs[k][2];
+
+                                    if(type==4)
+                                        b_l.at<float>(k)= vals[k]/256.0;
+                                    else if(type==3)
+                                        b_l.at<float>(k)= (float)valc[k];
+                                }
+                            }
+
+                        } else if( ui->robustMenu->currentIndex()==1 ){  // trimmed fit
+                            ninl=nimg-8;
+                            //   for (int k=0; k<nimg;k++)
+                            //     if(shd[k]==0) ninl=ninl+1;
+
+
+
+                            //  idx[0];
+
+                            if( ui->fitterMenu->currentIndex()==0 || ui->fitterMenu->currentIndex()==2) {
+                                L_uv=Mat::zeros(ninl,6,DataType<float>::type);
+                                b_l=Mat::zeros(ninl,1,CV_32FC1);
+                            }
+
+                            if(ui->fitterMenu->currentIndex()==1){//PS
+                                L_uv=Mat::zeros(ninl,3,DataType<float>::type);
+                                b_l=Mat::zeros(ninl,1,CV_32FC1);
+                            }
+
+                            if(ui->fitterMenu->currentIndex()==0) {// standard PTM
+                                int k=0;
+                                for (int p=0; p<nimg;p++)
+                                    if(idx[p] >3 && idx[p] < nimg-4 )
+                                    {
+                                        L_uv.at<float>(k,0)=pow( dirs[k][0] ,2);
+                                        L_uv.at<float>(k,1)=pow( dirs[k][1],2);
+                                        L_uv.at<float>(k,2)=(dirs[k][0] * dirs[k][1]);
+                                        L_uv.at<float>(k,3)=dirs[k][0];
+                                        L_uv.at<float>(k,4)=dirs[k][1];
+                                        L_uv.at<float>(k,5)=1;
+                                        if(type==4)
+                                            b_l.at<float>(k)= vals[k]/256.0;
+                                        else if(type==3)
+                                            b_l.at<float>(k)= (float)valc[k];
+                                        k=k+1;
+
+                                    }
+                            }
+                            if(ui->fitterMenu->currentIndex()==2) {// Drews PTM
+
+                                int k=0;
+                                for (int p=0; p<nimg;p++)
+                                    if(idx[p] >3 && idx[p] < nimg-4 ){
+                                        L_uv.at<float>(k,0)=dirs[k][0];
+                                        L_uv.at<float>(k,1)=dirs[k][1];
+                                        L_uv.at<float>(k,2)=dirs[k][2];
+                                        L_uv.at<float>(k,3)=pow( dirs[k][0] ,2);
+                                        L_uv.at<float>(k,4)=(dirs[k][0] * dirs[k][1]);
+                                        L_uv.at<float>(k,5)=1;
+
+                                        if(type==4)
+                                            b_l.at<float>(k)= vals[k]/256.0;
+                                        else if(type==3)
+                                            b_l.at<float>(k)= (float)valc[k];
+                                        k=k+1;
+                                    }
+                            }
+                            if(ui->fitterMenu->currentIndex()==1) {// PS
+
+                                int k=0;
+                                for (int p=0; p<nimg;p++)
+                                    if(idx[p] >3 && idx[p] < nimg-4 ){
+                                        L_uv.at<float>(k,0)=dirs[k][0];
+                                        L_uv.at<float>(k,1)=dirs[k][1];
+                                        L_uv.at<float>(k,2)=dirs[k][2];
+
+                                        if(type==4)
+                                            b_l.at<float>(k)= vals[k]/256.0;
+                                        else if(type==3)
+                                            b_l.at<float>(k)= (float)valc[k];
+                                        k=k+1;
+                                    }
+                            }
+
+
+                        }
+
+
+                        solve(L_uv, b_l, sol_l, DECOMP_SVD);
+                        L_uv.release();
+                        b_l.release();
+
+                        if(ui->fitterMenu->currentIndex()==0 || ui->fitterMenu->currentIndex()==2) {// PTM
+                            for (int k=0;k<6;k++){
+                                if (cvIsNaN(sol_l.at<float>(k))==1){
+                                    sol_l.at<float>(k)=0;
+                                }
+                               // else
+                                    //sol_l.at<float>(k)=sol_l.at<float>(k);
+                            }
+
+                            outcoef.write((char*)&sol_l.at<float>(0),sizeof(float));
+                            outcoef1.write((char*)&sol_l.at<float>(1),sizeof(float));
+                            outcoef2.write((char*)&sol_l.at<float>(2),sizeof(float));
+                            outcoef3.write((char*)&sol_l.at<float>(3),sizeof(float));
+                            outcoef4.write((char*)&sol_l.at<float>(4),sizeof(float));
+                            outcoef5.write((char*)&sol_l.at<float>(5),sizeof(float));
+
+
+                            if(cc==0)
+                            albedo.at<unsigned char>(j,i) = (unsigned char)sol_l.at<float>(5);
+                            if(cc==1)
+                             albedog.at<unsigned char>(j,i) = (unsigned char)sol_l.at<float>(5);
+                            if(cc==2)
+                            albedob.at<unsigned char>(j,i) = (unsigned char)sol_l.at<float>(5);
+
+                            float speck=0, shy=0, she=0, stand=0;
+                            float diffe,thr;
+                            for (int k=0; k<nimg;k++){
+                                if(type==2)
+                                    diffe= vals[k]/256.0;
+                                else
+                                    diffe = valc[k];
+
+                                she = she+4*sh[k];
+
+                                // 12
+
+                                thr= 12;
+
+
+                                if(ui->fitterMenu->currentIndex()==0)
+                                    diffe = diffe-(sol_l.at<float>(0)*pow( dirs[k][0] ,2)
+                                            +sol_l.at<float>(1)*pow( dirs[k][1],2)
+                                            +sol_l.at<float>(2)*(dirs[k][0] * dirs[k][1])
+                                            +sol_l.at<float>(3)*dirs[k][0]
+                                            +sol_l.at<float>(4)*dirs[k][1]
+                                            +sol_l.at<float>(5));
+                                else
+                                    diffe = diffe-(sol_l.at<float>(0)*dirs[k][0]
+                                            +sol_l.at<float>(1)*dirs[k][1]
+                                            +sol_l.at<float>(2)*dirs[k][2]
+                                            +sol_l.at<float>(3)*pow( dirs[k][0] ,2)
+                                            +sol_l.at<float>(4)*(dirs[k][0] * dirs[k][1])
+                                            +sol_l.at<float>(5));
+
+
+                                stand=stand+diffe*diffe;
+
+
+                                if(diffe>thr)
+                                    speck=speck+4;
+                                if(diffe<-thr)
+                                    shy=shy+4;
+
+                            }
+                            for(int k=0;k<3;k++)
+                                val[k]=speck;
+                            him.at<Vec3b>(j,i)= val;
+                            for(int k=0;k<3;k++)
+                                val[k]=shy;
+                            shim.at<Vec3b>(j,i)= val;
+
+
+                            for(int k=0;k<3;k++)
+                                val[k]=25*sqrt(stand)/nimg;
+
+                            test.at<Vec3b>(j,i)= val;
+
+                            for(int k=0;k<3;k++)
+                                val[k]=speck+shy;
+
+                            outlim.at<Vec3b>(j,i)= val;
+
+                        }
+                        else if(ui->fitterMenu->currentIndex()==1){
+
+                            outcoef.write((char*)&sol_l.at<float>(0),sizeof(float));
+                            outcoef1.write((char*)&sol_l.at<float>(1),sizeof(float));
+                            outcoef2.write((char*)&sol_l.at<float>(2),sizeof(float));
+
+                            float nf = sqrt(sol_l.at<float>(0)*sol_l.at<float>(0)+sol_l.at<float>(1)*sol_l.at<float>(1)+sol_l.at<float>(2)*sol_l.at<float>(2));
+
+
+                            for(int k=0;k<3;k++)
+                                val[2-k] = 255*0.5*(1+sol_l.at<float>(k)/nf);
+
+                            normals.at<Vec3b>(j,i) = val;
+                            if(cc==0)
+                            albedo.at<unsigned char>(j,i) = 0.6*nf;
+                            if(cc==1)
+                             albedog.at<unsigned char>(j,i) = 0.6*nf;
+                            if(cc==2)
+                            albedob.at<unsigned char>(j,i) = 0.6*nf;
+
+
+                            // estimating features
+                            float speck=0, shy=0, she=0, stand=0;
+                            float diffe,thr;
+
+                            for (int k=0; k<nimg;k++){
+                                if(type==2)
+                                    diffe= vals[k]/256.0;
+                                else
+                                    diffe = valc[k];
+
+                                she = she+4*sh[k];
+
+                                thr=12;
+                                /*thr= 0.1*(sol_l.at<float>(0)*dirs[k][0]
+                                    +sol_l.at<float>(1)*dirs[k][1]
+                                    +sol_l.at<float>(2)*dirs[k][2]);*/
+
+                                diffe = diffe-(sol_l.at<float>(0)*dirs[k][0]
+                                        +sol_l.at<float>(1)*dirs[k][1]
+                                        +sol_l.at<float>(2)*dirs[k][2]);
+
+                                stand=stand+diffe*diffe;
+
+
+                                if(diffe>thr)
+                                    speck=speck+4;
+                                if(diffe<-thr)
+                                    shy=shy+4;
+
+                            }
+                            for(int k=0;k<3;k++)
+                                val[k]=speck;
+                            him.at<Vec3b>(j,i)= val;
+                            for(int k=0;k<3;k++)
+                                val[k]=shy;
+                            shim.at<Vec3b>(j,i)= val;
+
+                            for(int k=0;k<3;k++)
+                                val[k]=20*sqrt(stand)/nimg;
+
+                            test.at<Vec3b>(j,i)= val;
+
+                            for(int k=0;k<3;k++)
+                                val[k]=speck+shy;
+
+                            outlim.at<Vec3b>(j,i)= val;
+
+                        }
+
+                        if(ui->fitterMenu->currentIndex()==2){
+                            float nf = sqrt(sol_l.at<float>(0)*sol_l.at<float>(0)+sol_l.at<float>(1)*sol_l.at<float>(1)+sol_l.at<float>(2)*sol_l.at<float>(2));
+
+                            for(int k=0;k<3;k++)
+                                val[2-k] = 255*0.5*(1+sol_l.at<float>(k)/nf);
+
+                            normals.at<Vec3b>(j,i) = val;
+                            if(cc==0)
+                            albedo.at<unsigned char>(j,i) = 0.6*nf;
+                            if(cc==1)
+                             albedog.at<unsigned char>(j,i) = 0.6*nf;
+                            if(cc==2)
+                            albedob.at<unsigned char>(j,i) = 0.6*nf;
+                            //qDebug() << val[2] << " ----- " << albedo.at<unsigned char>(j,i);
+                        }
+
+
+
+                    }
+
+            albedos.at(2) = albedo;
+            albedos.at(1) = albedog;
+            albedos.at(0) = albedob;
             }
+        if(type==4){ // 16 bit RGB
+
+            for(int cc=0; cc<3;cc++) { // loop over colors
+                for(int j=0;j<size[1];j++)
+                    for(int i=0;i<size[0];i++)
+                    {
+                        if(dirtype==2) // interpolated dirs: estimate pixel-specific direction
+                            for(int k=0;k<nimg;k++)
+                            {
+                                dirs[k][0]=dircoeffs[k][0]*i+dircoeffs[k][1]*j+dircoeffs[k][2];
+                                dirs[k][1]=dircoeffs[k][3]*i+dircoeffs[k][4]*j+dircoeffs[k][5];
+                                dirs[k][2]=dircoeffs[k][6]*i+dircoeffs[k][7]*j+dircoeffs[k][8];
+                            }
+
+                        in.readRawData((char*)&vals[0], nimg);
+                        vector<unsigned char> vec (&vals[0], &vals[0]+nimg );
+
+                        int l=0,ninl=0;
+
+                        // fit full set
+                        if(ui->robustMenu->currentIndex()==0 ){ // full set
+                            if( ui->fitterMenu->currentIndex()==0 || ui->fitterMenu->currentIndex()==2) {
+                                L_uv=Mat::zeros(nimg,6,DataType<float>::type);
+                                b_l=Mat::zeros(nimg,1,CV_32FC1);
+                            }
+
+                            if(ui->fitterMenu->currentIndex()==1){//PS
+                                L_uv=Mat::zeros(nimg,3,DataType<float>::type);
+                                b_l=Mat::zeros(nimg,1,CV_32FC1);
+                            }
+
+                            if(ui->fitterMenu->currentIndex()==0) {// standard PTM
+
+                                for (int k=0; k<nimg;k++){
+                                    L_uv.at<float>(k,0)=pow( dirs[k][0] ,2);
+                                    L_uv.at<float>(k,1)=pow( dirs[k][1],2);
+                                    L_uv.at<float>(k,2)=(dirs[k][0] * dirs[k][1]);
+                                    L_uv.at<float>(k,3)=dirs[k][0];
+                                    L_uv.at<float>(k,4)=dirs[k][1];
+                                    L_uv.at<float>(k,5)=1;
+                                    if(type==4)
+                                        b_l.at<float>(k)= vals[k]/256.0;
+                                    else if(type==3)
+                                        b_l.at<float>(k)= (float)valc[k];
+
+                                }
+                            }
+                            if(ui->fitterMenu->currentIndex()==2) {// Drews PTM
+
+                                for (int k=0; k<nimg;k++){
+                                    L_uv.at<float>(k,0)=dirs[k][0];
+                                    L_uv.at<float>(k,1)=dirs[k][1];
+                                    L_uv.at<float>(k,2)=dirs[k][2];
+                                    L_uv.at<float>(k,3)=pow( dirs[k][0] ,2);
+                                    L_uv.at<float>(k,4)=(dirs[k][0] * dirs[k][1]);
+                                    L_uv.at<float>(k,5)=1;
+
+                                    if(type==4)
+                                        b_l.at<float>(k)= vals[k]/256.0;
+                                    else if(type==3)
+                                        b_l.at<float>(k)= (float)valc[k];
+                                }
+                            }
+                            if(ui->fitterMenu->currentIndex()==1) {// PS
+
+                                for (int k=0; k<nimg;k++){
+                                    L_uv.at<float>(k,0)=dirs[k][0];
+                                    L_uv.at<float>(k,1)=dirs[k][1];
+                                    L_uv.at<float>(k,2)=dirs[k][2];
+
+                                    if(type==4)
+                                        b_l.at<float>(k)= vals[k]/256.0;
+                                    else if(type==3)
+                                        b_l.at<float>(k)= (float)valc[k];
+                                }
+                            }
+
+                        } else if( ui->robustMenu->currentIndex()==1 ){  // trimmed fit
+                            ninl=nimg-8;
+                            //   for (int k=0; k<nimg;k++)
+                            //     if(shd[k]==0) ninl=ninl+1;
+
+
+
+                            //  idx[0];
+
+                            if( ui->fitterMenu->currentIndex()==0 || ui->fitterMenu->currentIndex()==2) {
+                                L_uv=Mat::zeros(ninl,6,DataType<float>::type);
+                                b_l=Mat::zeros(ninl,1,CV_32FC1);
+                            }
+
+                            if(ui->fitterMenu->currentIndex()==1){//PS
+                                L_uv=Mat::zeros(ninl,3,DataType<float>::type);
+                                b_l=Mat::zeros(ninl,1,CV_32FC1);
+                            }
+
+                            if(ui->fitterMenu->currentIndex()==0) {// standard PTM
+                                int k=0;
+                                for (int p=0; p<nimg;p++)
+                                    if(idx[p] >3 && idx[p] < nimg-4 )
+                                    {
+                                        L_uv.at<float>(k,0)=pow( dirs[k][0] ,2);
+                                        L_uv.at<float>(k,1)=pow( dirs[k][1],2);
+                                        L_uv.at<float>(k,2)=(dirs[k][0] * dirs[k][1]);
+                                        L_uv.at<float>(k,3)=dirs[k][0];
+                                        L_uv.at<float>(k,4)=dirs[k][1];
+                                        L_uv.at<float>(k,5)=1;
+                                        if(type==4)
+                                            b_l.at<float>(k)= vals[k]/256.0;
+                                        else if(type==3)
+                                            b_l.at<float>(k)= (float)valc[k];
+                                        k=k+1;
+
+                                    }
+                            }
+                            if(ui->fitterMenu->currentIndex()==2) {// Drews PTM
+
+                                int k=0;
+                                for (int p=0; p<nimg;p++)
+                                    if(idx[p] >3 && idx[p] < nimg-4 ){
+                                        L_uv.at<float>(k,0)=dirs[k][0];
+                                        L_uv.at<float>(k,1)=dirs[k][1];
+                                        L_uv.at<float>(k,2)=dirs[k][2];
+                                        L_uv.at<float>(k,3)=pow( dirs[k][0] ,2);
+                                        L_uv.at<float>(k,4)=(dirs[k][0] * dirs[k][1]);
+                                        L_uv.at<float>(k,5)=1;
+
+                                        if(type==4)
+                                            b_l.at<float>(k)= vals[k]/256.0;
+                                        else if(type==3)
+                                            b_l.at<float>(k)= (float)valc[k];
+                                        k=k+1;
+                                    }
+                            }
+                            if(ui->fitterMenu->currentIndex()==1) {// PS
+
+                                int k=0;
+                                for (int p=0; p<nimg;p++)
+                                    if(idx[p] >3 && idx[p] < nimg-4 ){
+                                        L_uv.at<float>(k,0)=dirs[k][0];
+                                        L_uv.at<float>(k,1)=dirs[k][1];
+                                        L_uv.at<float>(k,2)=dirs[k][2];
+
+                                        if(type==4)
+                                            b_l.at<float>(k)= vals[k]/256.0;
+                                        else if(type==3)
+                                            b_l.at<float>(k)= (float)valc[k];
+                                        k=k+1;
+                                    }
+                            }
+
+
+                        }
+
+
+                        solve(L_uv, b_l, sol_l, DECOMP_SVD);
+                        L_uv.release();
+                        b_l.release();
+
+                        if(ui->fitterMenu->currentIndex()==0 || ui->fitterMenu->currentIndex()==2) {// PTM
+                            for (int k=0;k<6;k++){
+                                if (cvIsNaN(sol_l.at<float>(k))==1){
+                                    sol_l.at<float>(k)=0;
+                                }
+                               // else
+                                    //sol_l.at<float>(k)=sol_l.at<float>(k);
+                            }
+
+                            outcoef.write((char*)&sol_l.at<float>(0),sizeof(float));
+                            outcoef1.write((char*)&sol_l.at<float>(1),sizeof(float));
+                            outcoef2.write((char*)&sol_l.at<float>(2),sizeof(float));
+                            outcoef3.write((char*)&sol_l.at<float>(3),sizeof(float));
+                            outcoef4.write((char*)&sol_l.at<float>(4),sizeof(float));
+                            outcoef5.write((char*)&sol_l.at<float>(5),sizeof(float));
+
+
+                            if(cc==0)
+                            albedo.at<unsigned char>(j,i) = (unsigned char)sol_l.at<float>(5);
+                            if(cc==1)
+                             albedog.at<unsigned char>(j,i) = (unsigned char)sol_l.at<float>(5);
+                            if(cc==2)
+                            albedob.at<unsigned char>(j,i) = (unsigned char)sol_l.at<float>(5);
+
+                            float speck=0, shy=0, she=0, stand=0;
+                            float diffe,thr;
+                            for (int k=0; k<nimg;k++){
+                                if(type==2)
+                                    diffe= vals[k]/256.0;
+                                else
+                                    diffe = valc[k];
+
+                                she = she+4*sh[k];
+
+                                // 12
+
+                                thr= 12;
+
+
+                                if(ui->fitterMenu->currentIndex()==0)
+                                    diffe = diffe-(sol_l.at<float>(0)*pow( dirs[k][0] ,2)
+                                            +sol_l.at<float>(1)*pow( dirs[k][1],2)
+                                            +sol_l.at<float>(2)*(dirs[k][0] * dirs[k][1])
+                                            +sol_l.at<float>(3)*dirs[k][0]
+                                            +sol_l.at<float>(4)*dirs[k][1]
+                                            +sol_l.at<float>(5));
+                                else
+                                    diffe = diffe-(sol_l.at<float>(0)*dirs[k][0]
+                                            +sol_l.at<float>(1)*dirs[k][1]
+                                            +sol_l.at<float>(2)*dirs[k][2]
+                                            +sol_l.at<float>(3)*pow( dirs[k][0] ,2)
+                                            +sol_l.at<float>(4)*(dirs[k][0] * dirs[k][1])
+                                            +sol_l.at<float>(5));
+
+
+                                stand=stand+diffe*diffe;
+
+
+                                if(diffe>thr)
+                                    speck=speck+4;
+                                if(diffe<-thr)
+                                    shy=shy+4;
+
+                            }
+                            for(int k=0;k<3;k++)
+                                val[k]=speck;
+                            him.at<Vec3b>(j,i)= val;
+                            for(int k=0;k<3;k++)
+                                val[k]=shy;
+                            shim.at<Vec3b>(j,i)= val;
+
+
+                            for(int k=0;k<3;k++)
+                                val[k]=25*sqrt(stand)/nimg;
+
+                            test.at<Vec3b>(j,i)= val;
+
+                            for(int k=0;k<3;k++)
+                                val[k]=speck+shy;
+
+                            outlim.at<Vec3b>(j,i)= val;
+
+                        }
+                        else if(ui->fitterMenu->currentIndex()==1){
+
+                            outcoef.write((char*)&sol_l.at<float>(0),sizeof(float));
+                            outcoef1.write((char*)&sol_l.at<float>(1),sizeof(float));
+                            outcoef2.write((char*)&sol_l.at<float>(2),sizeof(float));
+
+                            float nf = sqrt(sol_l.at<float>(0)*sol_l.at<float>(0)+sol_l.at<float>(1)*sol_l.at<float>(1)+sol_l.at<float>(2)*sol_l.at<float>(2));
+
+
+                            for(int k=0;k<3;k++)
+                                val[2-k] = 255*0.5*(1+sol_l.at<float>(k)/nf);
+
+                            normals.at<Vec3b>(j,i) = val;
+                            if(cc==0)
+                            albedo.at<unsigned char>(j,i) = 0.6*nf;
+                            if(cc==1)
+                             albedog.at<unsigned char>(j,i) = 0.6*nf;
+                            if(cc==2)
+                            albedob.at<unsigned char>(j,i) = 0.6*nf;
+
+
+                            // estimating features
+                            float speck=0, shy=0, she=0, stand=0;
+                            float diffe,thr;
+
+                            for (int k=0; k<nimg;k++){
+                                if(type==2)
+                                    diffe= vals[k]/256.0;
+                                else
+                                    diffe = valc[k];
+
+                                she = she+4*sh[k];
+
+                                thr=12;
+                                /*thr= 0.1*(sol_l.at<float>(0)*dirs[k][0]
+                                    +sol_l.at<float>(1)*dirs[k][1]
+                                    +sol_l.at<float>(2)*dirs[k][2]);*/
+
+                                diffe = diffe-(sol_l.at<float>(0)*dirs[k][0]
+                                        +sol_l.at<float>(1)*dirs[k][1]
+                                        +sol_l.at<float>(2)*dirs[k][2]);
+
+                                stand=stand+diffe*diffe;
+
+
+                                if(diffe>thr)
+                                    speck=speck+4;
+                                if(diffe<-thr)
+                                    shy=shy+4;
+
+                            }
+                            for(int k=0;k<3;k++)
+                                val[k]=speck;
+                            him.at<Vec3b>(j,i)= val;
+                            for(int k=0;k<3;k++)
+                                val[k]=shy;
+                            shim.at<Vec3b>(j,i)= val;
+
+                            for(int k=0;k<3;k++)
+                                val[k]=20*sqrt(stand)/nimg;
+
+                            test.at<Vec3b>(j,i)= val;
+
+                            for(int k=0;k<3;k++)
+                                val[k]=speck+shy;
+
+                            outlim.at<Vec3b>(j,i)= val;
+
+                        }
+
+                        if(ui->fitterMenu->currentIndex()==2){
+                            float nf = sqrt(sol_l.at<float>(0)*sol_l.at<float>(0)+sol_l.at<float>(1)*sol_l.at<float>(1)+sol_l.at<float>(2)*sol_l.at<float>(2));
+
+                            for(int k=0;k<3;k++)
+                                val[2-k] = 255*0.5*(1+sol_l.at<float>(k)/nf);
+
+                            normals.at<Vec3b>(j,i) = val;
+                            if(cc==0)
+                            albedo.at<unsigned char>(j,i) = 0.6*nf;
+                            if(cc==1)
+                             albedog.at<unsigned char>(j,i) = 0.6*nf;
+                            if(cc==2)
+                            albedob.at<unsigned char>(j,i) = 0.6*nf;
+                            //qDebug() << val[2] << " ----- " << albedo.at<unsigned char>(j,i);
+                        }
+
+
+
+                    }
+
+            albedos.at(2) = albedo;
+            albedos.at(1) = albedog;
+            albedos.at(0) = albedob;
+
+
+
+            qDebug() << "not implemented yet";
+
 
 
 
         }
+
+
+    }
+    } // end loop over colors
+
 
     outcoef.close();
     outcoef1.close();
@@ -1124,17 +1941,18 @@ void apTool::on_processButton_clicked()
 
     filename.replace(".apd",".ptm");
 
-    qDebug() << filename;
+    int lastc= filename.lastIndexOf(QDir::separator());
+    QString lastname=filename.right(filename.size()-lastc-1);
 
+
+
+    if(type < 2){
     if(ui->fitterMenu->currentIndex()==0) {// convert saved coeffs to viewable ptm
-        savePTM_LRGB(filename,size[0],size[1],chroma_img);
+        savePTM_LRGB(lastname,size[0],size[1],chroma_img);
 
-    ui->msgBox->setText("saved LRGB .ptm file" + filename);
-    imwrite("central.png",albedo);
-}
-    // if(ui->fitterMenu->currentIndex()==1 || ui->fitterMenu->currentIndex()==2) //
-    //    saveNAL(size[0],size[1],chroma_img); // saving normals and albedo to file (16 bit png)
+        ui->msgBox->setText("saved LRGB .ptm file" + lastname);
 
+    }
     if(ui->fitterMenu->currentIndex()==1  || ui->fitterMenu->currentIndex()==2){
 
         imwrite("normals.png",normals);
@@ -1144,20 +1962,20 @@ void apTool::on_processButton_clicked()
         cv::cvtColor(normals,normals, cv::COLOR_BGR2RGB);
         cv::cvtColor(albedo, albedo, cv::COLOR_GRAY2BGR);
         if(ui->fitViewBox->currentIndex()==2){
-        iw->setImage(albedo);
-        iw->show();
+            iw->setImage(albedo);
+            iw->show();
         }
         if(ui->fitViewBox->currentIndex()==1){
-        iw->setImage(normals);
-        iw->show();
+            iw->setImage(normals);
+            iw->show();
         }
         if(ui->fitViewBox->currentIndex()==4){
-        iw->setImage(test);
-        iw->show();
+            iw->setImage(test);
+            iw->show();
         }
         if(ui->fitViewBox->currentIndex()==3){
-        iw->setImage(outlim);
-        iw->show();
+            iw->setImage(outlim);
+            iw->show();
         }
 
     }
@@ -1165,28 +1983,97 @@ void apTool::on_processButton_clicked()
     if(ui->fitterMenu->currentIndex()==0){
 
         if(ui->fitViewBox->currentIndex()==1){
-          ui->msgBox->setText("Normals not estimated in PTM mode");
+            ui->msgBox->setText("Normals not estimated in PTM mode");
         }
         if(ui->fitViewBox->currentIndex()==2){
-         ui->msgBox->setText("Albedo not estimated in PTM mode");
+            ui->msgBox->setText("Albedo not estimated in PTM mode");
         }
         if(ui->fitViewBox->currentIndex()==4){
-        iw->setImage(test);
-        iw->show();
+            iw->setImage(test);
+            iw->show();
         }
         if(ui->fitViewBox->currentIndex()==3){
-        iw->setImage(outlim);
-        iw->show();
+            iw->setImage(outlim);
+            iw->show();
         }
 
     }
 
 
-    imwrite("him.png",him);  
+    imwrite("him.png",him);
     imwrite("shim.png",shim);
     imwrite("outlim.png",outlim);
     
     imwrite("residual.png",test);
+
+    }
+    else{ // COLOR - type>2
+        if(ui->fitterMenu->currentIndex()==0) {// convert saved coeffs to viewable ptm
+
+            savePTM_RGB(lastname,size[0],size[1]);
+            cv::Mat colorImage;
+            cv::merge(albedos, colorImage);
+            imwrite("albedo.png",colorImage);
+
+            cv::cvtColor(colorImage, colorImage, cv::COLOR_BGR2RGB);
+            if(ui->fitViewBox->currentIndex()==2){
+                iw->setImage(colorImage);
+                iw->show();
+            }
+    }
+    if(ui->fitterMenu->currentIndex()==1  || ui->fitterMenu->currentIndex()==2){
+
+        imwrite("normals.png",normals);
+        imwrite("albedo.png",albedo);
+        ui->msgBox->setText("saved normals and albedo images");
+
+        cv::cvtColor(normals,normals, cv::COLOR_BGR2RGB);
+        cv::cvtColor(albedo, albedo, cv::COLOR_GRAY2BGR);
+        if(ui->fitViewBox->currentIndex()==2){
+            iw->setImage(albedo);
+            iw->show();
+        }
+        if(ui->fitViewBox->currentIndex()==1){
+            iw->setImage(normals);
+            iw->show();
+        }
+        if(ui->fitViewBox->currentIndex()==4){
+            iw->setImage(test);
+            iw->show();
+        }
+        if(ui->fitViewBox->currentIndex()==3){
+            iw->setImage(outlim);
+            iw->show();
+        }
+
+    }
+
+    if(ui->fitterMenu->currentIndex()==0){
+
+        if(ui->fitViewBox->currentIndex()==1){
+            ui->msgBox->setText("Normals not estimated in PTM mode");
+        }
+        if(ui->fitViewBox->currentIndex()==2){
+            ui->msgBox->setText("Albedo not estimated in PTM mode");
+        }
+        if(ui->fitViewBox->currentIndex()==4){
+            iw->setImage(test);
+            iw->show();
+        }
+        if(ui->fitViewBox->currentIndex()==3){
+            iw->setImage(outlim);
+            iw->show();
+        }
+
+    }
+
+
+    imwrite("him.png",him);
+    imwrite("shim.png",shim);
+    imwrite("outlim.png",outlim);
+
+    imwrite("residual.png",test);
+}
 
     filed.close();
 }
@@ -1199,12 +2086,12 @@ void apTool::on_showButton_clicked()
     iw->white2->setGeometry(QRect(0,0,0,0));
     iw->point2->setGeometry(QRect(0,0,0,0));
     iw->CoordinatesSet2=false;
-// QUESTA è la funzione da modificare
+
     QString filename = ui->fileNameLine->text();
     QFile file(filename);
     qDebug() << filename;
 
-    int last= filename.lastIndexOf("/");
+    int last= filename.lastIndexOf(QDir::separator());
     QString folder=filename.left(last+1);
 
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
@@ -1258,9 +2145,9 @@ void apTool::on_showButton_clicked()
 
 
         if(parts[0]== "CHROMA_IMAGE"  ){
-          //  chroma_img = parts[1];
+            //  chroma_img = parts[1];
             chroma_img = folder+parts[1];
-                    qDebug() << chroma_img;
+            qDebug() << chroma_img;
 
         }
 
@@ -1362,11 +2249,11 @@ void apTool::on_showButton_clicked()
     unsigned short* vals = new unsigned short[nimg];
     unsigned char** colc = new unsigned char*[3];
     for(int k=0; k<3; k++){
-         colc[k] = new unsigned char[nimg];
+        colc[k] = new unsigned char[nimg];
     }
 
     // this was processing to analyze the light directions
-    //estimate triangulations of the lights in the central pixel not used now
+    //estimate triangulations of the lights in the central pixel not used now but will use in new smart algorithms...
 
     std::vector<Shx> pts, pts2, hull, pt, ptt, hu;
     Shx poi,po;
@@ -1418,7 +2305,7 @@ void apTool::on_showButton_clicked()
         qDebug() << i << " " << inds[i] << " " << elev[inds[i]] << " " << azim[inds[i]];
     }
 
-     // inds will contain indices in lx order
+    // inds will contain indices in lx order
     vector<size_t> indxx(nimg);
     for (size_t i = 0; i < nimg; ++i) indxx[i] = i;
     sort (indxx.begin (), indxx.end (), compare_index<vector<float> &>(xx));
@@ -1470,18 +2357,18 @@ void apTool::on_showButton_clicked()
     pt.clear();
 
 
-// Da qui la parte che interessa
+    // Da qui la parte che interessa
 
-   // read the chromaticity image in a opencv image
+    // read the chromaticity image in a opencv image
 
 
     cv::Mat image;
 
     if(type < 3){
-    image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
-    cv::cvtColor(image,image, cv::COLOR_BGR2RGB);
-}
-   // iw->load(chroma_img);
+        image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
+        cv::cvtColor(image,image, cv::COLOR_BGR2RGB);
+    }
+
     iw->setImage(shownImg);
     iw->show();
 
@@ -1525,38 +2412,38 @@ void apTool::on_showButton_clicked()
     // Part to look at: loop over APA pixel blocks
 
     if(type <3)
-    for(int j=0;j<size[1];j++)
-        for(int i=0;i<size[0];i++)
-        {
+        for(int j=0;j<size[1];j++)
+            for(int i=0;i<size[0];i++)
+            {
 
-            if(dirtype==2) // interpolated dirs: estimate pixel-specific direction
-                for(int k=0;k<nimg;k++)
-                {
-                    dirs[k][0]=dircoeffs[k][0]*i+dircoeffs[k][1]*j+dircoeffs[k][2];
-                    dirs[k][1]=dircoeffs[k][3]*i+dircoeffs[k][4]*j+dircoeffs[k][5];
-                    dirs[k][2]=dircoeffs[k][6]*i+dircoeffs[k][7]*j+dircoeffs[k][8];
+                if(dirtype==2) // interpolated dirs: estimate pixel-specific direction
+                    for(int k=0;k<nimg;k++)
+                    {
+                        dirs[k][0]=dircoeffs[k][0]*i+dircoeffs[k][1]*j+dircoeffs[k][2];
+                        dirs[k][1]=dircoeffs[k][3]*i+dircoeffs[k][4]*j+dircoeffs[k][5];
+                        dirs[k][2]=dircoeffs[k][6]*i+dircoeffs[k][7]*j+dircoeffs[k][8];
 
-                    if(i==0 && j==0)
-                        qDebug() << " 0,0 - " << dirs[k][0] << " " << dirs[k][1] << " "  << dirs[k][2];
-                    if(i==size[0]-1 && j==size[1]-1)
-                        qDebug() << " end  - " << dirs[k][0] << " " << dirs[k][1] << " "  << dirs[k][2];
-                }
+                        if(i==0 && j==0)
+                            qDebug() << " 0,0 - " << dirs[k][0] << " " << dirs[k][1] << " "  << dirs[k][2];
+                        if(i==size[0]-1 && j==size[1]-1)
+                            qDebug() << " end  - " << dirs[k][0] << " " << dirs[k][1] << " "  << dirs[k][2];
+                    }
 
-            // 8 bit LRGB
-            if(type==1){
-                in.readRawData((char*)&valc[0], nimg);
-                vector<unsigned char> vec (&valc[0], &valc[0]+nimg );
-                int medi, mini, maxi;
-                vector<int> shad;
-                vector<int> shad2, tmpv;
-                // 8 bit version,
+                // 8 bit LRGB
+                if(type==1){
+                    in.readRawData((char*)&valc[0], nimg);
+                    vector<unsigned char> vec (&valc[0], &valc[0]+nimg );
+                    int medi, mini, maxi;
+                    vector<int> shad;
+                    vector<int> shad2, tmpv;
+                    // 8 bit version,
 
-                // read pixel data and do some processing. on this skeleton we can
-                // develop fitters, estimate normals, detect shadows and edges, etc.
+                    // read pixel data and do some processing. on this skeleton we can
+                    // develop fitters, estimate normals, detect shadows and edges, etc.
 
-                float avg;
-                vector<size_t> idx(vec.size());
-        /*        for (size_t p = 0; p != idx.size(); ++p) {idx[p] = p; avg=avg+vec[p];}
+                    float avg;
+                    vector<size_t> idx(vec.size());
+                    /*        for (size_t p = 0; p != idx.size(); ++p) {idx[p] = p; avg=avg+vec[p];}
                 sort (idx.begin (), idx.end (), compare_index<vector<unsigned char> &>(vec));
                 avg /= vec.size();
 
@@ -1568,56 +2455,56 @@ void apTool::on_showButton_clicked()
                     medi = idx[(vec.size())/2];*/
 
 
-     /*  Vec3f cc; cc[0] = 0.2126; cc[1] = 0.7152; cc[2] = 0.0722;*/
+                    /*  Vec3f cc; cc[0] = 0.2126; cc[1] = 0.7152; cc[2] = 0.0722;*/
 
-                if(ui->viewBox->currentIndex()==0){
-                    for (size_t p = 0; p != idx.size(); ++p) {idx[p] = p; }
-                                   sort (idx.begin (), idx.end (), compare_index<vector<unsigned char> &>(vec));
+                    if(ui->viewBox->currentIndex()==0){
+                        for (size_t p = 0; p != idx.size(); ++p) {idx[p] = p; }
+                        sort (idx.begin (), idx.end (), compare_index<vector<unsigned char> &>(vec));
 
-                                   mini = idx[0];
-                                   maxi = idx[nimg-1];
-                                   if((vec.size()/2) % 2 == 0)
-                                       medi = idx[(vec.size())/2 + 1];
-                                   else
-                                       medi = idx[(vec.size())/2];
+                        mini = idx[0];
+                        maxi = idx[nimg-1];
+                        if((vec.size()/2) % 2 == 0)
+                            medi = idx[(vec.size())/2 + 1];
+                        else
+                            medi = idx[(vec.size())/2];
 
 
-                    for(int k=0;k<3;k++){
-                        Vec3b col=image.at<Vec3b>(j,i);
-                        float nc = col[0]+col[1]+col[2];
-                        val[k] = 3*col[k]*vec[medi]/(nc);
+                        for(int k=0;k<3;k++){
+                            Vec3b col=image.at<Vec3b>(j,i);
+                            float nc = col[0]+col[1]+col[2];
+                            val[k] = 3*col[k]*vec[medi]/(nc);
+                        }
+
                     }
+                    else if(ui->viewBox->currentIndex()==1){
+                        for (size_t p = 0; p != idx.size(); ++p) {avg=avg+vec[p];}
+                        avg /= vec.size();
 
-                }
-                else if(ui->viewBox->currentIndex()==1){
-                    for (size_t p = 0; p != idx.size(); ++p) {avg=avg+vec[p];}
-                                    avg /= vec.size();
+                        for(int k=0;k<3;k++){
+                            Vec3b col=image.at<Vec3b>(j,i);
+                            float nc = col[0]+col[1]+col[2];
+                            val[k] = 3*col[k]*avg/(nc);
+                        }
 
-                    for(int k=0;k<3;k++){
-                        Vec3b col=image.at<Vec3b>(j,i);
-                        float nc = col[0]+col[1]+col[2];
-                        val[k] = 3*col[k]*avg/(nc);
                     }
+                    else if(ui->viewBox->currentIndex()==2){
+                        // interpolate
+                        // QUI DA IMPLEMENTARE!
 
-                }
-                else if(ui->viewBox->currentIndex()==2){
-                    // interpolate
-                    // QUI DA IMPLEMENTARE!
-
-                  //  qDebug() << i << " " << j  << "\n";
-/*
+                        //  qDebug() << i << " " << j  << "\n";
+                        /*
                     float lx = ui->lxSpinBox->value();
                     float ly = ui->lySpinBox->value();
                     float lz = (1-lx*lx-ly*ly);
 */
-                    Vec3b col=image.at<Vec3b>(j,i);
-                    float nc = col[0]+col[1]+col[2];
+                        Vec3b col=image.at<Vec3b>(j,i);
+                        float nc = col[0]+col[1]+col[2];
 
-                    int nen=7;
-                    if (flagInterp == false) {
-                    rbfcreate(2, 1, modelInterpolation);
-                    arrayInterpolation.setlength(nen, 3);
-/*
+                        int nen=7;
+                        if (flagInterp == false) {
+                            rbfcreate(2, 1, modelInterpolation);
+                            arrayInterpolation.setlength(nen, 3);
+                            /*
                     for(int k=0;k<vec.size();k++){
                         float dv=(lx-dirs[k][0])*(lx-dirs[k][0])+(ly-dirs[k][1])*(ly-dirs[k][1])+(lz-dirs[k][2])*(lz-dirs[k][2]);
                         dist.push_back(dv);
@@ -1628,32 +2515,32 @@ void apTool::on_showButton_clicked()
                     sort (iv.begin (), iv.end (), compare_index<vector<float> &>(dist));
                     dist.clear();*/
 
-                    for(int k1=0; k1<nen; k1++)
-                        for(int k2=0; k2<2; k2++) {
-                            arrayInterpolation(k1, k2) = dirs[iv[k1]][k2];
+                            for(int k1=0; k1<nen; k1++)
+                                for(int k2=0; k2<2; k2++) {
+                                    arrayInterpolation(k1, k2) = dirs[iv[k1]][k2];
+                                }
+
+                            flagInterp=true;
                         }
 
-                    flagInterp=true;
-                    }
-
-                    for(int k=0; k<nen; k++)
-                        arrayInterpolation(k, 2) = vec[iv[k]];
+                        for(int k=0; k<nen; k++)
+                            arrayInterpolation(k, 2) = vec[iv[k]];
 
 
-                    rbfsetpoints(modelInterpolation, arrayInterpolation);
-                    float rr = ui->rbfSpinBox->value();
-                    rbfsetalgomultilayer(modelInterpolation, rr, 1, 10e-3);
+                        rbfsetpoints(modelInterpolation, arrayInterpolation);
+                        float rr = ui->rbfSpinBox->value();
+                        rbfsetalgomultilayer(modelInterpolation, rr, 1, 10e-3);
 
-                    rbfbuildmodel(modelInterpolation, repInterpolation);
+                        rbfbuildmodel(modelInterpolation, repInterpolation);
 
-                    double res = rbfcalc2(modelInterpolation, lx, ly);
+                        double res = rbfcalc2(modelInterpolation, lx, ly);
 
-                    for (int k=0; k<3; k++)
-                        val[k] = 3*col[k]*res/(nc);
+                        for (int k=0; k<3; k++)
+                            val[k] = 3*col[k]*res/(nc);
 
 
 
-                    /*
+                        /*
 
                     float distvector[] = {(lx-dirs[iv[0]][0])*(lx-dirs[iv[0]][0])+(ly-dirs[iv[0]][1])*(ly-dirs[iv[0]][1])+(lz-dirs[iv[0]][2])*(lz-dirs[iv[0]][2]),
                                           (lx-dirs[iv[1]][0])*(lx-dirs[iv[1]][0])+(ly-dirs[iv[1]][1])*(ly-dirs[iv[1]][1])+(lz-dirs[iv[1]][2])*(lz-dirs[iv[1]][2]),
@@ -1673,25 +2560,25 @@ void apTool::on_showButton_clicked()
                         for (int i = 0; i < 3; i++)
                             val[k] = val[k] + (3*col[k]*vec[iv[i]]/(nc*256))*((distf-distvector[i])/distf);
                     }*/
+                    }
+
+                    shownImg.at<Vec3b>(j,i) = val;
+
                 }
+                // 16 bit LRGB
+                if(type==2){
 
-                shownImg.at<Vec3b>(j,i) = val;
+                    // read pixel data and do some processing. on this skeleton we can
+                    // develop fitters, estimate normals, detect shadows and edges, etc.
 
-            }
-            // 16 bit LRGB
-            if(type==2){
+                    in.readRawData((char*)&vals[0], nimg*2);
+                    vector<unsigned short> vec (&vals[0], &vals[0]+nimg );
+                    int medi, mini, maxi;
 
-                // read pixel data and do some processing. on this skeleton we can
-                // develop fitters, estimate normals, detect shadows and edges, etc.
+                    int out;
 
-                in.readRawData((char*)&vals[0], nimg*2);
-                vector<unsigned short> vec (&vals[0], &vals[0]+nimg );
-                int medi, mini, maxi;
-
-                int out;
-
-                float avg;
-              /*  vector<size_t> idx(vec.size());
+                    float avg;
+                    /*  vector<size_t> idx(vec.size());
                 for (size_t p = 0; p != idx.size(); ++p) {idx[p] = p; avg=avg+vec[p];}
                 sort (idx.begin (), idx.end (), compare_index<vector<unsigned short> &>(vec));
                 avg /= vec.size();
@@ -1704,93 +2591,93 @@ void apTool::on_showButton_clicked()
                     medi = idx[(vec.size())/2];
 */
 
-     /*  Vec3f cc; cc[0] = 0.2126; cc[1] = 0.7152; cc[2] = 0.0722;*/
+                    /*  Vec3f cc; cc[0] = 0.2126; cc[1] = 0.7152; cc[2] = 0.0722;*/
 
-                if(ui->viewBox->currentIndex()==0){
-                    vector<size_t> idx(vec.size());
-                    for (size_t p = 0; p != idx.size(); ++p) {idx[p] = p;}
-                    sort (idx.begin (), idx.end (), compare_index<vector<unsigned short> &>(vec));
+                    if(ui->viewBox->currentIndex()==0){
+                        vector<size_t> idx(vec.size());
+                        for (size_t p = 0; p != idx.size(); ++p) {idx[p] = p;}
+                        sort (idx.begin (), idx.end (), compare_index<vector<unsigned short> &>(vec));
 
-                    mini = idx[0];
-                    maxi = idx[nimg-1];
-                    if((vec.size()/2) % 2 == 0)
-                        medi = idx[(vec.size())/2 + 1];
-                    else
-                        medi = idx[(vec.size())/2];
+                        mini = idx[0];
+                        maxi = idx[nimg-1];
+                        if((vec.size()/2) % 2 == 0)
+                            medi = idx[(vec.size())/2 + 1];
+                        else
+                            medi = idx[(vec.size())/2];
 
-                    for(int k=0;k<3;k++){
-                        Vec3b col=image.at<Vec3b>(j,i);
+                        for(int k=0;k<3;k++){
+                            Vec3b col=image.at<Vec3b>(j,i);
 
-                        float nc = col[0]+col[1]+col[2];
-                        val[k] = 3*col[k]*vec[medi]/(nc*256);
+                            float nc = col[0]+col[1]+col[2];
+                            val[k] = 3*col[k]*vec[medi]/(nc*256);
+                        }
                     }
-                }
-                else if(ui->viewBox->currentIndex()==1){
-                     vector<size_t> idx(vec.size());
-                    for (size_t p = 0; p != idx.size(); ++p) {avg=avg+vec[p];}
-                    avg /= vec.size();
+                    else if(ui->viewBox->currentIndex()==1){
+                        vector<size_t> idx(vec.size());
+                        for (size_t p = 0; p != idx.size(); ++p) {avg=avg+vec[p];}
+                        avg /= vec.size();
 
-                    for(int k=0;k<3;k++){
-                        Vec3b col=image.at<Vec3b>(j,i);
+                        for(int k=0;k<3;k++){
+                            Vec3b col=image.at<Vec3b>(j,i);
 
-                        float nc = col[0]+col[1]+col[2];
+                            float nc = col[0]+col[1]+col[2];
 
-                        val[k] = 3*col[k]*avg/(nc*256);
+                            val[k] = 3*col[k]*avg/(nc*256);
+                        }
                     }
-                }
-                else if(ui->viewBox->currentIndex()==2){
-                    // interpolate
-                    // QUI DA IMPLEMENTARE!
+                    else if(ui->viewBox->currentIndex()==2){
+                        // interpolate
+                        // QUI DA IMPLEMENTARE!
 
-  /*                  qDebug() << i << " " << j  << "\n";
+                        /*                  qDebug() << i << " " << j  << "\n";
 
                     float lx = ui->lxSpinBox->value();
                     float ly = ui->lySpinBox->value();
                     float lz = (1-lx*lx-ly*ly);
 */
-                    Vec3b col=image.at<Vec3b>(j,i);
-                    float nc = col[0]+col[1]+col[2];
-int nen=7;
-                    if (flagInterp == false) {
-                    rbfcreate(2, 1, modelInterpolation);
-                    arrayInterpolation.setlength(nen, 3);
+                        Vec3b col=image.at<Vec3b>(j,i);
+                        float nc = col[0]+col[1]+col[2];
+                        int nen=7;
+                        if (flagInterp == false) {
+                            rbfcreate(2, 1, modelInterpolation);
+                            arrayInterpolation.setlength(nen, 3);
 
-                    for(int k=0;k<vec.size();k++){
-                        float dv=(lx-dirs[k][0])*(lx-dirs[k][0])+(ly-dirs[k][1])*(ly-dirs[k][1])+(lz-dirs[k][2])*(lz-dirs[k][2]);
-                        dist.push_back(dv);
-                    }
+                            for(int k=0;k<vec.size();k++){
+                                float dv=(lx-dirs[k][0])*(lx-dirs[k][0])+(ly-dirs[k][1])*(ly-dirs[k][1])+(lz-dirs[k][2])*(lz-dirs[k][2]);
+                                dist.push_back(dv);
+                            }
 
-                    /*
+                            /*
                     iv.resize(vec.size());
                     for (size_t p = 0; p != iv.size(); ++p) iv[p] = p;
                     sort (iv.begin (), iv.end (), compare_index<vector<float> &>(dist));
                     dist.clear();
                     */
 
-                    for(int k1=0; k1<nen; k1++)
-                        for(int k2=0; k2<2; k2++) {
-                            arrayInterpolation(k1, k2) = dirs[iv[k1]][k2];
+                            for(int k1=0; k1<nen; k1++)
+                                for(int k2=0; k2<2; k2++) {
+                                    arrayInterpolation(k1, k2) = dirs[iv[k1]][k2];
+                                }
+
+                            flagInterp=true;
                         }
 
-                    flagInterp=true;
-                    }
-
-                    for(int k=0; k<nen; k++)
-                        arrayInterpolation(k, 2) = vec[iv[k]];
+                        for(int k=0; k<nen; k++)
+                            arrayInterpolation(k, 2) = vec[iv[k]];
 
 
-                    rbfsetpoints(modelInterpolation, arrayInterpolation);
-                    float rr = ui->rbfSpinBox->value();
-                    rbfsetalgomultilayer(modelInterpolation,rr, 1, 10e-3);
+                        rbfsetpoints(modelInterpolation, arrayInterpolation);
+                        float rr = ui->rbfSpinBox->value();
+                        rbfsetalgomultilayer(modelInterpolation,rr, 1, 10e-3);
 
-                    rbfbuildmodel(modelInterpolation, repInterpolation);
+                        rbfbuildmodel(modelInterpolation, repInterpolation);
 
-                    double res = rbfcalc2(modelInterpolation, lx, ly);
+                        double res = rbfcalc2(modelInterpolation, lx, ly);
 
-                    for (int k=0; k<3; k++)
-                        val[k] = 3*col[k]*res/(nc*256);
+                        for (int k=0; k<3; k++)
+                            val[k] = 3*col[k]*res/(nc*256);
 
-                  /*//ORA BANALMENTE PRENDE LA DISTANZA, ORDINA e prende nearst neighbor
+                        /*//ORA BANALMENTE PRENDE LA DISTANZA, ORDINA e prende nearst neighbor
                     for(int k=0;k<vec.size();k++){
                         float dv=(lx-dirs[k][0])*(lx-dirs[k][0])+(ly-dirs[k][1])*(ly-dirs[k][1])+(lz-dirs[k][2])*(lz-dirs[k][2]);
                         dist.push_back(dv);
@@ -1819,47 +2706,47 @@ int nen=7;
                         for (int i = 0; i < 3; i++)
                             val[k] = val[k] + (3*col[k]*vec[iv[i]]/(nc*256))*((distf-distvector[i])/distf);
                     }*/
+                    }
+
+                    shownImg.at<Vec3b>(j,i) = val;
                 }
 
-                shownImg.at<Vec3b>(j,i) = val;
             }
+    else if(type>2){
+        // 8 bit RGB
+        if(type==3)
+            for(int cc=0; cc<3;cc++) { // loop over colors
+                for(int j=0;j<size[1];j++)
+                    for(int i=0;i<size[0];i++)
+                    {
+                        if(dirtype==2) // interpolated dirs: estimate pixel-specific direction
+                            for(int k=0;k<nimg;k++)
+                            {
+                                dirs[k][0]=dircoeffs[k][0]*i+dircoeffs[k][1]*j+dircoeffs[k][2];
+                                dirs[k][1]=dircoeffs[k][3]*i+dircoeffs[k][4]*j+dircoeffs[k][5];
+                                dirs[k][2]=dircoeffs[k][6]*i+dircoeffs[k][7]*j+dircoeffs[k][8];
 
-    }
-     else if(type>2){
-    // 8 bit RGB
-    if(type==3)
-        for(int cc=0; cc<3;cc++) { // loop over colors
-            for(int j=0;j<size[1];j++)
-                for(int i=0;i<size[0];i++)
-                {
-        if(dirtype==2) // interpolated dirs: estimate pixel-specific direction
-            for(int k=0;k<nimg;k++)
-            {
-                dirs[k][0]=dircoeffs[k][0]*i+dircoeffs[k][1]*j+dircoeffs[k][2];
-                dirs[k][1]=dircoeffs[k][3]*i+dircoeffs[k][4]*j+dircoeffs[k][5];
-                dirs[k][2]=dircoeffs[k][6]*i+dircoeffs[k][7]*j+dircoeffs[k][8];
-
-                if(i==0 && j==0)
-                    qDebug() << " 0,0 - " << dirs[k][0] << " " << dirs[k][1] << " "  << dirs[k][2];
-                if(i==size[0]-1 && j==size[1]-1)
-                    qDebug() << " end  - " << dirs[k][0] << " " << dirs[k][1] << " "  << dirs[k][2];
-            }
+                                if(i==0 && j==0)
+                                    qDebug() << " 0,0 - " << dirs[k][0] << " " << dirs[k][1] << " "  << dirs[k][2];
+                                if(i==size[0]-1 && j==size[1]-1)
+                                    qDebug() << " end  - " << dirs[k][0] << " " << dirs[k][1] << " "  << dirs[k][2];
+                            }
 
 
 
-            in.readRawData((char*)&valc[0], nimg);
-            vector<unsigned char> vec (&valc[0], &valc[0]+nimg );
-            int medi, mini, maxi;
-            vector<int> shad;
-            vector<int> shad2, tmpv;
-            // 8 bit version,
+                        in.readRawData((char*)&valc[0], nimg);
+                        vector<unsigned char> vec (&valc[0], &valc[0]+nimg );
+                        int medi, mini, maxi;
+                        vector<int> shad;
+                        vector<int> shad2, tmpv;
+                        // 8 bit version,
 
-            // read pixel data and do some processing. on this skeleton we can
-            // develop fitters, estimate normals, detect shadows and edges, etc.
+                        // read pixel data and do some processing. on this skeleton we can
+                        // develop fitters, estimate normals, detect shadows and edges, etc.
 
-            float avg;
-            vector<size_t> idx(vec.size());
-           /* for (size_t p = 0; p != idx.size(); ++p) {idx[p] = p; avg=avg+vec[p];}
+                        float avg;
+                        vector<size_t> idx(vec.size());
+                        /* for (size_t p = 0; p != idx.size(); ++p) {idx[p] = p; avg=avg+vec[p];}
             sort (idx.begin (), idx.end (), compare_index<vector<unsigned char> &>(vec));
             avg /= vec.size();
 
@@ -1871,11 +2758,11 @@ int nen=7;
                 medi = idx[(vec.size())/2];
 
 */
- /*  Vec3f cc; cc[0] = 0.2126; cc[1] = 0.7152; cc[2] = 0.0722;*/
+                        /*  Vec3f cc; cc[0] = 0.2126; cc[1] = 0.7152; cc[2] = 0.0722;*/
 
-            if(ui->viewBox->currentIndex()==0){ // median
+                        if(ui->viewBox->currentIndex()==0){ // median
 
-               for (size_t p = 0; p != idx.size(); ++p) {idx[p] = p; }
+                            for (size_t p = 0; p != idx.size(); ++p) {idx[p] = p; }
                             sort (idx.begin (), idx.end (), compare_index<vector<unsigned char> &>(vec));
 
                             mini = idx[0];
@@ -1885,36 +2772,36 @@ int nen=7;
                             else
                                 medi = idx[(vec.size())/2];
 
-                    shownImg.at<Vec3b>(j,i)[cc] = vec[medi];
+                            shownImg.at<Vec3b>(j,i)[cc] = vec[medi];
 
 
-            }
-            else if(ui->viewBox->currentIndex()==1){ // mean
-                for (size_t p = 0; p != idx.size(); ++p) { avg=avg+vec[p];}
-                           avg /= vec.size();
+                        }
+                        else if(ui->viewBox->currentIndex()==1){ // mean
+                            for (size_t p = 0; p != idx.size(); ++p) { avg=avg+vec[p];}
+                            avg /= vec.size();
 
-                shownImg.at<Vec3b>(j,i)[cc] = avg;
+                            shownImg.at<Vec3b>(j,i)[cc] = avg;
 
-            }
-            else if(ui->viewBox->currentIndex()==2){ // directional
-                // interpolate
-                // QUI DA IMPLEMENTARE!
+                        }
+                        else if(ui->viewBox->currentIndex()==2){ // directional
+                            // interpolate
+                            // QUI DA IMPLEMENTARE!
 
-              //  qDebug() << i << " " << j  << "\n";
+                            //  qDebug() << i << " " << j  << "\n";
 
-  /*              float lx = ui->lxSpinBox->value();
+                            /*              float lx = ui->lxSpinBox->value();
                 float ly = ui->lySpinBox->value();
                 float lz = (1-lx*lx-ly*ly);*/
 
-               // Vec3b col=image.at<Vec3b>(j,i);
-               // float nc = col[0]+col[1]+col[2];
-                int nen=7;
+                            // Vec3b col=image.at<Vec3b>(j,i);
+                            // float nc = col[0]+col[1]+col[2];
+                            int nen=7;
 
-                if (flagInterp == false) {
-                rbfcreate(2, 1, modelInterpolation);
-                arrayInterpolation.setlength(nen, 3);
+                            if (flagInterp == false) {
+                                rbfcreate(2, 1, modelInterpolation);
+                                arrayInterpolation.setlength(nen, 3);
 
-                /*
+                                /*
                 for(int k=0;k<vec.size();k++){
                     float dv=(lx-dirs[k][0])*(lx-dirs[k][0])+(ly-dirs[k][1])*(ly-dirs[k][1])+(lz-dirs[k][2])*(lz-dirs[k][2]);
                     dist.push_back(dv);
@@ -1926,32 +2813,32 @@ int nen=7;
                 dist.clear();
 */
 
-                for(int k1=0; k1<nen; k1++)
-                    for(int k2=0; k2<2; k2++) {
-                        arrayInterpolation(k1, k2) = dirs[iv[k1]][k2];
-                    }
+                                for(int k1=0; k1<nen; k1++)
+                                    for(int k2=0; k2<2; k2++) {
+                                        arrayInterpolation(k1, k2) = dirs[iv[k1]][k2];
+                                    }
 
-                flagInterp=true;
-                }
+                                flagInterp=true;
+                            }
 
-                for(int k=0; k<nen; k++)
-                    arrayInterpolation(k, 2) = vec[iv[k]];
+                            for(int k=0; k<nen; k++)
+                                arrayInterpolation(k, 2) = vec[iv[k]];
 
 
-                rbfsetpoints(modelInterpolation, arrayInterpolation);
-                 float rr = ui->rbfSpinBox->value();
-                rbfsetalgomultilayer(modelInterpolation, rr, 1, 10e-3);
+                            rbfsetpoints(modelInterpolation, arrayInterpolation);
+                            float rr = ui->rbfSpinBox->value();
+                            rbfsetalgomultilayer(modelInterpolation, rr, 1, 10e-3);
 
-                rbfbuildmodel(modelInterpolation, repInterpolation);
+                            rbfbuildmodel(modelInterpolation, repInterpolation);
 
-                double res = rbfcalc2(modelInterpolation, lx, ly);
+                            double res = rbfcalc2(modelInterpolation, lx, ly);
 
-               // for (int k=0; k<3; k++)
-               //     val[cc] = 3*col[cc]*res/(nc);
+                            // for (int k=0; k<3; k++)
+                            //     val[cc] = 3*col[cc]*res/(nc);
 
-            shownImg.at<Vec3b>(j,i)[cc] = res;
+                            shownImg.at<Vec3b>(j,i)[cc] = res;
 
-                /*//ORA BANALMENTE PRENDE LA DISTANZA, ORDINA e prende nearst neighbor
+                            /*//ORA BANALMENTE PRENDE LA DISTANZA, ORDINA e prende nearst neighbor
                 for(int k=0;k<vec.size();k++){
                     float dv=(lx-dirs[k][0])*(lx-dirs[k][0])+(ly-dirs[k][1])*(ly-dirs[k][1])+(lz-dirs[k][2])*(lz-dirs[k][2]);
                     dist.push_back(dv);
@@ -1980,15 +2867,13 @@ int nen=7;
                     for (int i = 0; i < 3; i++)
                         val[k] = val[k] + (3*col[k]*vec[iv[i]]/(nc*256))*((distf-distvector[i])/distf);
                 }*/
-            }
-                }
+                        }
+                    }
 
-             } // end loop over colors
+            } // end loop over colors
 
     }
 
- //   float lx = ui->lxSpinBox->value();
-  //  float ly = ui->lySpinBox->value();
 
     if(ui->viewBox->currentIndex()==0){
         ui->msgBox->setText("Median image");
@@ -1996,10 +2881,10 @@ int nen=7;
     if(ui->viewBox->currentIndex()==1){
         ui->msgBox->setText("Median image");
     }
-     if(ui->viewBox->currentIndex()==2){
-    ui->msgBox->setText("Rbf interpolated image");
-    ui->msgBox->append("Relighted from" + QString::number(lx) +  " " + QString::number(ly));
-}
+    if(ui->viewBox->currentIndex()==2){
+        ui->msgBox->setText("Rbf interpolated image");
+        ui->msgBox->append("Relighted from" + QString::number(lx) +  " " + QString::number(ly));
+    }
 
     iw->imageLabel->setPixmap(QPixmap::fromImage(QImage(shownImg.data,shownImg.cols,shownImg.rows,shownImg.step,QImage::Format_RGB888)));
 
@@ -2091,7 +2976,7 @@ void apTool::showAP(String windowName)
 
     QString filename = ui->fileNameLine->text();
     QFile file(filename);
-    int last= filename.lastIndexOf("/");
+    int last= filename.lastIndexOf(QDir::separator());
     QString folder=filename.left(last+1);
 
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
@@ -2103,31 +2988,31 @@ void apTool::showAP(String windowName)
     int wid=0;
     int hei=0;
 
-        if (windowName.compare("AP 1") == 0) {
-            if (iw->CoordinatesSet1==true) {
-                x = iw->x1/zoom;
-                y = iw->y1/zoom;
-            }
-            else {
-                x = iw->white1->x()/zoom;
-                y = iw->white1->y()/zoom;
-                wid = iw->white1->width();
-                hei = iw->white1->height();
-            }
+    if (windowName.compare("AP 1") == 0) {
+        if (iw->CoordinatesSet1==true) {
+            x = iw->x1/zoom;
+            y = iw->y1/zoom;
         }
-        else if (windowName.compare("AP 2") == 0) {
-            if (iw->CoordinatesSet2==true) {
-                    x = iw->x2/zoom;
-                    y = iw->y2/zoom;
-                }
-            else {
-                x = iw->white2->x()/zoom;
-                y = iw->white2->y()/zoom;
-                wid = iw->white2->width();
-                hei = iw->white2->height();
-            }
+        else {
+            x = iw->white1->x()/zoom;
+            y = iw->white1->y()/zoom;
+            wid = iw->white1->width();
+            hei = iw->white1->height();
         }
-        else return;
+    }
+    else if (windowName.compare("AP 2") == 0) {
+        if (iw->CoordinatesSet2==true) {
+            x = iw->x2/zoom;
+            y = iw->y2/zoom;
+        }
+        else {
+            x = iw->white2->x()/zoom;
+            y = iw->white2->y()/zoom;
+            wid = iw->white2->width();
+            hei = iw->white2->height();
+        }
+    }
+    else return;
 
     if (iw->CoordinatesSet1==false && iw->CoordinatesSet2==false && (wid == 0 || hei ==0))
         return;
@@ -2285,21 +3170,21 @@ void apTool::showAP(String windowName)
     QDataStream in(&filed);
 
     if(type==1){
-    for(int j=1;j<y;j++)
-        for (int i=1;i<=size[0];i++)
-            in.readRawData((char*)&valc[0], nimg);
+        for(int j=1;j<y;j++)
+            for (int i=1;i<=size[0];i++)
+                in.readRawData((char*)&valc[0], nimg);
 
-    for(int i=1;i<=x;i++)
-        in.readRawData((char*)&valc[0], nimg);
+        for(int i=1;i<=x;i++)
+            in.readRawData((char*)&valc[0], nimg);
     }
 
     if(type==2){
-    for(int j=1;j<y;j++)
-        for (int i=1;i<=size[0];i++)
-            in.readRawData((char*)&vals[0], nimg*2);
+        for(int j=1;j<y;j++)
+            for (int i=1;i<=size[0];i++)
+                in.readRawData((char*)&vals[0], nimg*2);
 
-    for(int i=1;i<=x;i++)
-        in.readRawData((char*)&vals[0], nimg*2);
+        for(int i=1;i<=x;i++)
+            in.readRawData((char*)&vals[0], nimg*2);
     }
 
 
@@ -2317,8 +3202,8 @@ void apTool::showAP(String windowName)
     arrayInterpolation.setlength(nimg, 3);
 
 
-vector<unsigned char> vecc;
-vector<unsigned short> vecs;
+    vector<unsigned char> vecc;
+    vector<unsigned short> vecs;
 
 
     for(int k1=0; k1<nimg; k1++)
@@ -2329,23 +3214,23 @@ vector<unsigned short> vecs;
     if (wid == 0 || hei ==0){
 
         if(type==2){
-        vector<unsigned short> vecs (&vals[0], &vals[0]+nimg);
+            vector<unsigned short> vecs (&vals[0], &vals[0]+nimg);
 
-        col=image.at<Vec3b>(y,x);
-        nc = col[0] + col[1] + col[2];
+            col=image.at<Vec3b>(y,x);
+            nc = col[0] + col[1] + col[2];
 
-        for(int k=0; k<nimg; k++)
-            arrayInterpolation(k, 2) = vecs[k];
+            for(int k=0; k<nimg; k++)
+                arrayInterpolation(k, 2) = vecs[k];
         }
 
         if(type==1){
-         vector<unsigned char> vecc (&valc[0], &valc[0]+nimg);
+            vector<unsigned char> vecc (&valc[0], &valc[0]+nimg);
 
-        col=image.at<Vec3b>(y,x);
-        nc = col[0] + col[1] + col[2];
+            col=image.at<Vec3b>(y,x);
+            nc = col[0] + col[1] + col[2];
 
-        for(int k=0; k<nimg; k++)
-            arrayInterpolation(k, 2) = vecc[k];
+            for(int k=0; k<nimg; k++)
+                arrayInterpolation(k, 2) = vecc[k];
         }
     }
 
@@ -2356,64 +3241,64 @@ vector<unsigned short> vecs;
         for(int k=0; k<nimg; k++)
             conv2[k] = 0;
         for(int k=0; k<3; k++)
-        col[k] = 0;
+            col[k] = 0;
 
 
         if(type==2)
-    for (int j = 0; j < hei; j++) {
-        for (int i = 0; i < wid; i++) {
+            for (int j = 0; j < hei; j++) {
+                for (int i = 0; i < wid; i++) {
 
-            Vec3b colPixel=image.at<Vec3b>(j,i);
-            for(int k=0; k<3; k++)
-                conv1[k] += colPixel[k];
-            nc += colPixel[0]+colPixel[1]+colPixel[2];
-            in.readRawData((char*)&vals[0], nimg*2);
-            vecs.assign(&vals[0], &vals[0]+nimg);
-            for(int k=0; k<nimg; k++)
-                conv2[k] += vecs[k];
+                    Vec3b colPixel=image.at<Vec3b>(j,i);
+                    for(int k=0; k<3; k++)
+                        conv1[k] += colPixel[k];
+                    nc += colPixel[0]+colPixel[1]+colPixel[2];
+                    in.readRawData((char*)&vals[0], nimg*2);
+                    vecs.assign(&vals[0], &vals[0]+nimg);
+                    for(int k=0; k<nimg; k++)
+                        conv2[k] += vecs[k];
 
-        }
-      for(int k=0; k<=size[0]-wid; k++)
-          in.readRawData((char*)&vals[0], nimg*2);
-      vecs.assign(&vals[0], &vals[0]+nimg);
-    }
+                }
+                for(int k=0; k<=size[0]-wid; k++)
+                    in.readRawData((char*)&vals[0], nimg*2);
+                vecs.assign(&vals[0], &vals[0]+nimg);
+            }
         if(type==1)
-    for (int j = 0; j < hei; j++) {
-        for (int i = 0; i < wid; i++) {
+            for (int j = 0; j < hei; j++) {
+                for (int i = 0; i < wid; i++) {
 
-            Vec3b colPixel=image.at<Vec3b>(j,i);
+                    Vec3b colPixel=image.at<Vec3b>(j,i);
+                    for(int k=0; k<3; k++)
+                        conv1[k] += colPixel[k];
+                    nc += colPixel[0]+colPixel[1]+colPixel[2];
+
+
+                    in.readRawData((char*)&valc[0], nimg);
+                    vecc.assign(&valc[0], &valc[0]+nimg);
+                    for(int k=0; k<nimg; k++)
+                        conv2[k] += vecc[k];
+                }
+                for(int k=0; k<=size[0]-wid; k++)
+                    in.readRawData((char*)&valc[0], nimg);
+                vecc.assign(&valc[0], &valc[0]+nimg);
+            }
+
+
+
+        for(int k=0; k<nimg; k++)
+            //qDebug() << conv2[k];
+            //qDebug() << conv1[0] << " " << conv1[1] << " " << conv1[2];
+            //qDebug() << nc;
+
             for(int k=0; k<3; k++)
-                conv1[k] += colPixel[k];
-            nc += colPixel[0]+colPixel[1]+colPixel[2];
-
-
-            in.readRawData((char*)&valc[0], nimg);
-            vecc.assign(&valc[0], &valc[0]+nimg);
-            for(int k=0; k<nimg; k++)
-                conv2[k] += vecc[k];
-        }
-      for(int k=0; k<=size[0]-wid; k++)
-          in.readRawData((char*)&valc[0], nimg);
-      vecc.assign(&valc[0], &valc[0]+nimg);
-    }
-
-
-
-    for(int k=0; k<nimg; k++)
-    //qDebug() << conv2[k];
-    //qDebug() << conv1[0] << " " << conv1[1] << " " << conv1[2];
-    //qDebug() << nc;
-
-    for(int k=0; k<3; k++)
-        col[k] = conv1[k]/(wid*hei);
-    nc = nc/(wid*hei);
-    for(int k=0; k<nimg; k++)
-        arrayInterpolation(k, 2) = conv2[k]/(wid*hei);
+                col[k] = conv1[k]/(wid*hei);
+        nc = nc/(wid*hei);
+        for(int k=0; k<nimg; k++)
+            arrayInterpolation(k, 2) = conv2[k]/(wid*hei);
 
     }
 
     rbfsetpoints(modelInterpolation, arrayInterpolation);
- float rr = ui->rbfSpinBox->value();
+    float rr = ui->rbfSpinBox->value();
     rbfsetalgomultilayer(modelInterpolation, rr, 1, 10e-3);
 
     rbfbuildmodel(modelInterpolation, repInterpolation);
@@ -2432,18 +3317,18 @@ vector<unsigned short> vecs;
 
             if (lx*lx+ly*ly <= 1) {
 
-                    double res = rbfcalc2(modelInterpolation, lx, ly);
-                    if (res > maxi) maxi=res;
-                    if(res<mini) mini=res;
-                    avgi=avgi+res;
-                    if(i==50 && j==50)  zeroval=res;
-                    ni=ni+1;
-                    if(type==2)
+                double res = rbfcalc2(modelInterpolation, lx, ly);
+                if (res > maxi) maxi=res;
+                if(res<mini) mini=res;
+                avgi=avgi+res;
+                if(i==50 && j==50)  zeroval=res;
+                ni=ni+1;
+                if(type==2)
                     for (int k=0; k<3; k++)
                         val[k] = 3*col[k]*res/(nc*256);
-                    if(type==1)
-                        for (int k=0; k<3; k++)
-                            val[k] = 3*col[k]*res/(nc);
+                if(type==1)
+                    for (int k=0; k<3; k++)
+                        val[k] = 3*col[k]*res/(nc);
             }
 
             else {
@@ -2452,15 +3337,15 @@ vector<unsigned short> vecs;
                 val[2]=255;
             }
 
-                for (int i2 = i*scale; i2 < i*scale+scale; i2++)
-                    for (int j2 = j*scale; j2 < j*scale+scale; j2++)
-                        shownImg.at<Vec3b>(j2,i2) = val;
-                }
+            for (int i2 = i*scale; i2 < i*scale+scale; i2++)
+                for (int j2 = j*scale; j2 < j*scale+scale; j2++)
+                    shownImg.at<Vec3b>(j2,i2) = val;
+        }
 
     avgi=avgi/ni;
-            ui->msgBox->setText("Plotted AP. Values at (0,0): " + QString::number(zeroval) + " average: " + QString::number(avgi));
-            ui->msgBox->append("Min: " + QString::number(mini) + " max: " + QString::number(maxi));
-cv::flip(shownImg,shownImg,0);
+    ui->msgBox->setText("Plotted AP. Values at (0,0): " + QString::number(zeroval) + " average: " + QString::number(avgi));
+    ui->msgBox->append("Min: " + QString::number(mini) + " max: " + QString::number(maxi));
+    cv::flip(shownImg,shownImg,0);
     imshow (windowName, shownImg);
 
     filed.close();
