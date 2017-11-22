@@ -46,7 +46,7 @@ void savePTM_LRGB(QString filename, int W, int H, QString chroma_img){
 
     double max[6], min[6];
     int bias[6];
-    char* files[6] = {"file.c1","file.c2","file.c3","file.c4","file.c5","file.c6"};
+    char* files[6] = {"ptmC1.bin","ptmC2.bin","ptmC3.bin","ptmC4.bin","ptmC5.bin","ptmC6.bin"};
     float scale[6];
     float* pBuff = new float[W*H];
     for (int i = 0; i <= 5; i++){
@@ -164,7 +164,7 @@ void savePTM_RGB(QString filename, int W, int H){
 
     double max[6*3], min[6*3];
     int bias[6];
-    char* files[6] = {"file.c1","file.c2","file.c3","file.c4","file.c5","file.c6"};
+    char* files[6] = {"ptmC1.bin","ptmC2.bin","ptmC3.bin","ptmC4.bin","ptmC5.bin","ptmC6.bin"};
     float scale[6*3];
     float* pBuff = new float[3*W*H];
 
@@ -306,12 +306,15 @@ void apTool::on_pushButton_clicked()
 
 void apTool::on_processButton_clicked()
 {
+// this is the code to fit models over AP data
+// AP types - variable type: 1 - Luminance char , 2 - luminance short , 3 RGB char, 4 RGB short, 0 error
+// direction info - variable dirtype: 1- constant 2 - interpolated
 
     QString filename = ui->fileNameLine->text();
     QFile file(filename);
     int last = filename.lastIndexOf(QDir::separator());
     QString folder=filename.left(last+1);
-    qDebug() <<folder;
+
 
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
         return;
@@ -324,10 +327,12 @@ void apTool::on_processButton_clicked()
     float** dircoeffs;
     QString chroma_img;
 
+    // to output binary files with coefficients
     ofstream outcoef, outcoef1, outcoef2, outcoef3, outcoef4, outcoef5;
 
-    QTextStream textStream(&file);
+    // read AP header
 
+    QTextStream textStream(&file);
     QString line = textStream.readLine();
 
     if (line.isNull())
@@ -339,7 +344,6 @@ void apTool::on_processButton_clicked()
 
     while(!(line.isNull())){
         line = textStream.readLine();
-        // qDebug() << line;
 
         parts = line.split(" ");
         if(parts[0]== "LUMINANCE_TYPE" && parts[1]== "UNSIGNED_CHAR" ){
@@ -364,7 +368,6 @@ void apTool::on_processButton_clicked()
         if(parts[0]== "CHROMA_IMAGE"  ){
             chroma_img = folder+parts[1];
             qDebug() << chroma_img;
-
         }
 
         if(parts[0]== "IMAGE_SIZE"  ){
@@ -409,14 +412,14 @@ void apTool::on_processButton_clicked()
                     for(int j=0;j<9;j++)
                         dircoeffs[i][j] = parts[j].toFloat();
 
-                    //qDebug() << dircoeffs[i][0] << " " << dircoeffs[i][1] << " " << dircoeffs[i][5];
                     float c_x=size[0]/2;float c_y=size[1]/2;
+                    // computing interpolated direction in the image center
                     dirs[i][0]=dircoeffs[i][0]*c_x+dircoeffs[i][1]*c_y+dircoeffs[i][2];
                     dirs[i][1]=dircoeffs[i][3]*c_x+dircoeffs[i][4]*c_y+dircoeffs[i][5];
                     dirs[i][2]=dircoeffs[i][6]*c_x+dircoeffs[i][7]*c_y+dircoeffs[i][8];
-                    qDebug() << dirs[i][0] << " " << dirs[i][1] << " "  << dirs[i][2];
+                   // qDebug() << dirs[i][0] << " " << dirs[i][1] << " "  << dirs[i][2];
 
-                    // computing interpolated direction in the center
+
                 }
             }
         }
@@ -477,26 +480,28 @@ void apTool::on_processButton_clicked()
     Mat albedog(size[1],size[0],CV_8UC1);
     Mat albedob(size[1],size[0],CV_8UC1);
     std::vector<cv::Mat> albedos(3);
+
    // Mat normals2(size[1],size[0],CV_8UC3);
    // Mat normals3(size[1],size[0],CV_8UC3);
 
     Vec3f val;
     Vec3f dire;
 
+    unsigned char* valc;
+    if(type==1 || type==3) valc = new unsigned char[nimg];
 
-    unsigned char* valc = new unsigned char[nimg];
-    unsigned short* vals = new unsigned short[nimg];
-    unsigned char** colc = new unsigned char*[3];
-    for(int k=0; k<3; k++){
-        colc[k] = new unsigned char[nimg];
-    }
+    unsigned short* vals;
+    if(type==2 || type==4) vals = new unsigned short[nimg];
+
 
     Mat b_l,sol_l;
     Mat L_uv;
 
-
     std::vector<Shx> pts, pts2, hull, pt, ptt, hu;
     Shx poi,po;
+
+
+    // do some tests on light directions sorting and triangulating
 
     vector<float> elev;
     vector<float> azim;
@@ -545,6 +550,7 @@ void apTool::on_processButton_clicked()
         qDebug() << i << " " << inds[i] << " " << elev[inds[i]] << " " << azim[inds[i]];
     }
 
+    // indxx will contain indices in
     vector<size_t> indxx(nimg);
     for (size_t i = 0; i < nimg; ++i) indxx[i] = i;
     sort (indxx.begin (), indxx.end (), compare_index<vector<float> &>(xx));
@@ -563,7 +569,7 @@ void apTool::on_processButton_clicked()
     int ts = s_hull_pro( pts2, triads);
 
     write_Triads(triads, "triangles.txt");
-
+    // triangulation in the first space
 
     std::vector<Triad> triad2;
 
@@ -572,9 +578,10 @@ void apTool::on_processButton_clicked()
     int nx2 = de_duplicateX( pt, outx2, ptt);
 
     int t2 = s_hull_pro( ptt, triad2);
-
+// triangulation in the second space
 
     /* Test saving light points triangulation (works!)*/
+if(0){
     ofstream om;
 
     om.open ("mesh.off");
@@ -582,17 +589,23 @@ void apTool::on_processButton_clicked()
     om << pts.size() << " " << triads.size() << " " << "\n";
 
     for(int ii=0;ii<pts.size();ii++){
-        //   om <<  elev[ii] << " " << azim[ii] << " 0\n";
-        om << " " << elev[inds[ii]] << " " << azim[inds[ii]] << " 0 \n";
-        // qDebug() << "kk " << pts[ii].r << " " <<pts[ii].c << " " << elev[inds[ii]];
-        // om <<  pts[ii].r << " " <<pts[ii].c << " 0\n";
-    }
+         om << " " << elev[inds[ii]] << " " << azim[inds[ii]] << " 0 \n";
+       }
 
+    for( size_t i = 0; i < triads.size(); i++ )
+    {
+
+        om << "3 " << triads[i].a <<  " " << triads[i].b << " " << triads[i].c << endl;
+
+    }
+    om.close();
+}
     unsigned char nema[nimg][nimg];
     for (int i=0;i<nimg;i++)
         for (int j=0;j<nimg;j++)
             nema[i][j]=0;
 
+  // adjacency matrix for vertices
     for( size_t i = 0; i < triads.size(); i++ )
     {
         nema[triads[i].a][triads[i].b]=1;
@@ -600,12 +613,9 @@ void apTool::on_processButton_clicked()
         nema[triads[i].b][triads[i].c]=1;
         nema[triads[i].c][triads[i].b]=1;
         nema[triads[i].c][triads[i].a]=1;
-        nema[triads[i].a][triads[i].c]=1;
-        //  om << "3 " << inds[triads[i].a] <<  " " << inds[triads[i].b] << " " << inds[triads[i].c] << endl;
-        om << "3 " << triads[i].a <<  " " << triads[i].b << " " << triads[i].c << endl;
-
+        nema[triads[i].a][triads[i].c]=1;  
     }
-    om.close();
+
 
 
 
@@ -615,42 +625,49 @@ void apTool::on_processButton_clicked()
                 neigh[i].push_back(j);
 
     qDebug() << "nei 0 " << neigh[0][0] << " " << neigh[0][1];
-    /*
-    for( size_t i = 0; i < 1; i++ )
-    {
-    for(int p=0;p<neigh[i].size();p++){
-        float val=0;
-        for(int k=0;k<3;k++){
-            val= val+dirs[inds[i]][k]*dirs[inds[neigh[i][p]]][k];
-            qDebug()<< dirs[inds[i]][k] << " " << dirs[inds[neigh[i][p]]][k];
-        }
-        qDebug()<< i <<  " " <<  elev[inds[i]] << "+ " << inds[i] << " " << elev[neigh[i][p]] << " " << pts[i].r << "-" << pts[neigh[i][p]].r << " " << neigh[i][p] << " " << val << " ? " << dp[inds[i]][inds[neigh[i][p]]];
-        }
-     }
-*/
 
 
     pts.clear();
     pts2.clear();
     pt.clear();
 
+    // still not really used,
     vector<size_t> il(nimg); //inliers
     vector<size_t> hl(nimg); //highlight
     vector<size_t> sh(nimg); //shadow
     vector<float> shd(nimg); //shadow
     vector<size_t> idx(nimg);
 
+if( ui->fitterMenu->currentIndex()==0){
+    outcoef.open ("ptmC1.bin", ios::out | ios::binary);
+    outcoef1.open ("ptmC2.bin", ios::out | ios::binary);
+    outcoef2.open ("ptmC3.bin", ios::out | ios::binary);
+    outcoef3.open ("ptmC4.bin", ios::out | ios::binary);
+    outcoef4.open ("ptmC5.bin", ios::out | ios::binary);
+    outcoef5.open ("ptmC6.bin", ios::out | ios::binary);
+}
+if(ui->fitterMenu->currentIndex()==2){
+    outcoef.open ("DrewPtmC1.bin", ios::out | ios::binary);
+    outcoef1.open ("DrewPtmC2.bin", ios::out | ios::binary);
+    outcoef2.open ("DrewPtmC3.bin", ios::out | ios::binary);
+    outcoef3.open ("DrewPtmC4.bin", ios::out | ios::binary);
+    outcoef4.open ("DrewPtmC5.bin", ios::out | ios::binary);
+    outcoef5.open ("DrewPtmC6.bin", ios::out | ios::binary);
+}
+if(ui->fitterMenu->currentIndex()==1){
+    outcoef.open ("albedo.bin", ios::out | ios::binary);
+    outcoef1.open ("nx.bin", ios::out | ios::binary);
+    outcoef2.open ("ny.bin", ios::out | ios::binary);
+    outcoef3.open ("nz.bin", ios::out | ios::binary);
+}
+if(ui->fitterMenu->currentIndex()==3) {return; }// HSH to be implemented}
+if(ui->fitterMenu->currentIndex()==4) {return; } // DMD}
+if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
 
-    outcoef.open ("file.c1", ios::out | ios::binary);
-    outcoef1.open ("file.c2", ios::out | ios::binary);
-    outcoef2.open ("file.c3", ios::out | ios::binary);
-    outcoef3.open ("file.c4", ios::out | ios::binary);
-    outcoef4.open ("file.c5", ios::out | ios::binary);
-    outcoef5.open ("file.c6", ios::out | ios::binary);
 
     // loop over APA pixel blocks
 
-    if(type <3)
+    if(type <3)   // if Luminance types, only 1 channel
         for(int j=0;j<size[1];j++)
             for(int i=0;i<size[0];i++)
             {
@@ -664,10 +681,10 @@ void apTool::on_processButton_clicked()
                         dirs[k][1]=dircoeffs[k][3]*i+dircoeffs[k][4]*j+dircoeffs[k][5];
                         dirs[k][2]=dircoeffs[k][6]*i+dircoeffs[k][7]*j+dircoeffs[k][8];
 
-                        if(i==0 && j==0)
-                            qDebug() << " 0,0 - " << dirs[k][0] << " " << dirs[k][1] << " "  << dirs[k][2];
-                        if(i==size[0]-1 && j==size[1]-1)
-                            qDebug() << " end  - " << dirs[k][0] << " " << dirs[k][1] << " "  << dirs[k][2];
+//                        if(i==0 && j==0)
+//                            qDebug() << " 0,0 - " << dirs[k][0] << " " << dirs[k][1] << " "  << dirs[k][2];
+//                        if(i==size[0]-1 && j==size[1]-1)
+//                            qDebug() << " end  - " << dirs[k][0] << " " << dirs[k][1] << " "  << dirs[k][2];
                     }
                 // 8 bit
                 if(type==1){
@@ -803,7 +820,7 @@ void apTool::on_processButton_clicked()
                         hl[idx[k]]=1;
                     }
 
-#if 0
+#if 0  // only tests exporting files with light positions, ap values etc.
                     // test writing points and values
 
                     if(i==100 && j==100){
@@ -945,7 +962,8 @@ void apTool::on_processButton_clicked()
                 int l=0,ninl=0;
 
                 // fit full set
-                if(ui->robustMenu->currentIndex()==0 ){ // full set
+                if(ui->robustMenu->currentIndex()==0 ){ // full set: take all the light directons
+
                     if( ui->fitterMenu->currentIndex()==0 || ui->fitterMenu->currentIndex()==2) {
                         L_uv=Mat::zeros(nimg,6,DataType<float>::type);
                         b_l=Mat::zeros(nimg,1,CV_32FC1);
@@ -1005,15 +1023,11 @@ void apTool::on_processButton_clicked()
                     }
 
                 } else if( ui->robustMenu->currentIndex()==1 ){
-                    qDebug() << "Trimmed";
+
                     // trimmed fit
                     ninl=nimg-8;
                     //   for (int k=0; k<nimg;k++)
                     //     if(shd[k]==0) ninl=ninl+1;
-
-
-
-                    //  idx[0];
 
                     if( ui->fitterMenu->currentIndex()==0 || ui->fitterMenu->currentIndex()==2) {
                         L_uv=Mat::zeros(ninl,6,DataType<float>::type);
@@ -1079,10 +1093,11 @@ void apTool::on_processButton_clicked()
                                 k=k+1;
                             }
                     }
-
-
+// to be added
+                    if(ui->fitterMenu->currentIndex()==3) {}// HSH
+                    if(ui->fitterMenu->currentIndex()==4) {}// DMD
+                    if(ui->fitterMenu->currentIndex()==5) {}// 3 order ptm
                 }
-
 
 
                 solve(L_uv, b_l, sol_l, DECOMP_SVD);
@@ -1168,12 +1183,22 @@ void apTool::on_processButton_clicked()
                 }
                 else if(ui->fitterMenu->currentIndex()==1){ //PS
 
-                    outcoef.write((char*)&sol_l.at<float>(0),sizeof(float));
-                    outcoef1.write((char*)&sol_l.at<float>(1),sizeof(float));
-                    outcoef2.write((char*)&sol_l.at<float>(2),sizeof(float));
+
 
                     float nf = sqrt(sol_l.at<float>(0)*sol_l.at<float>(0)+sol_l.at<float>(1)*sol_l.at<float>(1)+sol_l.at<float>(2)*sol_l.at<float>(2));
+                    float coe=nf;
+                    outcoef.write((char*)&coe,sizeof(float));
 
+                    coe=sol_l.at<float>(0)/nf;
+                    outcoef1.write((char*)&coe,sizeof(float));
+                    coe=sol_l.at<float>(1)/nf;
+                    outcoef2.write((char*)&coe,sizeof(float));
+                    coe=sol_l.at<float>(2)/nf;
+                    outcoef3.write((char*)&coe,sizeof(float));
+
+               /*     outcoef1.write((char*)&sol_l.at<float>(1),sizeof(float));
+                    outcoef2.write((char*)&sol_l.at<float>(2),sizeof(float));
+                    outcoef3.write((char*)&sol_l.at<float>(2),sizeof(float));*/
 
                     for(int k=0;k<3;k++)
                         val[2-k] = 255*0.5*(1+sol_l.at<float>(k)/nf);
@@ -1490,12 +1515,16 @@ void apTool::on_processButton_clicked()
                         }
                         else if(ui->fitterMenu->currentIndex()==1){
 
-                            outcoef.write((char*)&sol_l.at<float>(0),sizeof(float));
-                            outcoef1.write((char*)&sol_l.at<float>(1),sizeof(float));
-                            outcoef2.write((char*)&sol_l.at<float>(2),sizeof(float));
 
                             float nf = sqrt(sol_l.at<float>(0)*sol_l.at<float>(0)+sol_l.at<float>(1)*sol_l.at<float>(1)+sol_l.at<float>(2)*sol_l.at<float>(2));
-
+                            float coe;
+                            outcoef.write((char*)&nf,sizeof(float));
+                            coe=sol_l.at<float>(0)/nf;
+                            outcoef.write((char*)&coe,sizeof(float));
+                            coe=sol_l.at<float>(1)/nf;
+                            outcoef.write((char*)&coe,sizeof(float));
+                            coe=sol_l.at<float>(2)/nf;
+                            outcoef.write((char*)&coe,sizeof(float));
 
                             for(int k=0;k<3;k++)
                                 val[2-k] = 255*0.5*(1+sol_l.at<float>(k)/nf);
@@ -1936,8 +1965,11 @@ void apTool::on_processButton_clicked()
     outcoef1.close();
     outcoef2.close();
     outcoef3.close();
+
+    if(ui->fitterMenu->currentIndex()==2 || ui->fitterMenu->currentIndex()==1){
     outcoef4.close();
     outcoef5.close();
+    }
 
     filename.replace(".apd",".ptm");
 

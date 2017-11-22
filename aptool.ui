@@ -65,17 +65,17 @@
      </item>
      <item>
       <property name="text">
-       <string>3ord PTM</string>
-      </property>
-     </item>
-     <item>
-      <property name="text">
        <string>HSH</string>
       </property>
      </item>
      <item>
       <property name="text">
        <string>DMD</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>3ord PTM</string>
       </property>
      </item>
     </widget>
