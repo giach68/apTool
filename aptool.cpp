@@ -328,6 +328,7 @@ void apTool::on_processButton_clicked()
     QString chroma_img;
 
     // to output binary files with coefficients
+    // Tinsae HERE - if more coeff add related output variable
     ofstream outcoef, outcoef1, outcoef2, outcoef3, outcoef4, outcoef5;
 
     // read AP header
@@ -638,6 +639,9 @@ if(0){
     vector<float> shd(nimg); //shadow
     vector<size_t> idx(nimg);
 
+
+ //   Tinsae HERE - add case for HSH with names like h1.bin, etc.
+
 if( ui->fitterMenu->currentIndex()==0){
     outcoef.open ("ptmC1.bin", ios::out | ios::binary);
     outcoef1.open ("ptmC2.bin", ios::out | ios::binary);
@@ -660,6 +664,8 @@ if(ui->fitterMenu->currentIndex()==1){
     outcoef2.open ("ny.bin", ios::out | ios::binary);
     outcoef3.open ("nz.bin", ios::out | ios::binary);
 }
+
+
 if(ui->fitterMenu->currentIndex()==3) {return; }// HSH to be implemented}
 if(ui->fitterMenu->currentIndex()==4) {return; } // DMD}
 if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
@@ -696,10 +702,7 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                     //
 
                     vector<int> inli;
-
                     int out;
-
-
 
                     for (size_t p = 0; p != idx.size(); ++p) idx[p] = p;
                     sort (idx.begin (), idx.end (), compare_index<vector<unsigned char> &>(vec));
@@ -962,6 +965,8 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                 int l=0,ninl=0;
 
                 // fit full set
+               // Tinsae HERE - add hsh case allocating 9 or 16 values for Luv
+
                 if(ui->robustMenu->currentIndex()==0 ){ // full set: take all the light directons
 
                     if( ui->fitterMenu->currentIndex()==0 || ui->fitterMenu->currentIndex()==2) {
@@ -971,6 +976,11 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
 
                     if(ui->fitterMenu->currentIndex()==1){//PS
                         L_uv=Mat::zeros(nimg,3,DataType<float>::type);
+                        b_l=Mat::zeros(nimg,1,CV_32FC1);
+                    }
+
+                    if(ui->fitterMenu->currentIndex()==3){//hsh
+                        L_uv=Mat::zeros(nimg,9,DataType<float>::type);
                         b_l=Mat::zeros(nimg,1,CV_32FC1);
                     }
 
@@ -1009,8 +1019,6 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                     if(ui->fitterMenu->currentIndex()==1) {// PS
 
                         for (int k=0; k<nimg;k++){
-
-
                             L_uv.at<float>(k,0)=dirs[k][0];
                             L_uv.at<float>(k,1)=dirs[k][1];
                             L_uv.at<float>(k,2)=dirs[k][2];
@@ -1021,6 +1029,9 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                                 b_l.at<float>(k)= (float)valc[k];
                         }
                     }
+                     if(ui->fitterMenu->currentIndex()==3) {// HSH
+                        // Tinsae HERE - add evaluation
+                     }
 
                 } else if( ui->robustMenu->currentIndex()==1 ){
 
@@ -1765,7 +1776,6 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
 
                         }
 
-
                         solve(L_uv, b_l, sol_l, DECOMP_SVD);
                         L_uv.release();
                         b_l.release();
@@ -1860,7 +1870,6 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                             outcoef2.write((char*)&sol_l.at<float>(2),sizeof(float));
 
                             float nf = sqrt(sol_l.at<float>(0)*sol_l.at<float>(0)+sol_l.at<float>(1)*sol_l.at<float>(1)+sol_l.at<float>(2)*sol_l.at<float>(2));
-
 
                             for(int k=0;k<3;k++)
                                 val[2-k] = 255*0.5*(1+sol_l.at<float>(k)/nf);
@@ -1960,7 +1969,7 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
     }
     } // end loop over colors
 
-
+// Tinsae HERE - if more files opened, close
     outcoef.close();
     outcoef1.close();
     outcoef2.close();
@@ -1977,6 +1986,7 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
     QString lastname=filename.right(filename.size()-lastc-1);
 
 
+//Tinsae HERE - if hsh save related .hsh file
 
     if(type < 2){
     if(ui->fitterMenu->currentIndex()==0) {// convert saved coeffs to viewable ptm
