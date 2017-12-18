@@ -469,8 +469,7 @@ void apTool::on_processButton_clicked()
     if (!filed.open(QIODevice::ReadOnly))
         return;
 
-    unsigned char uchar;
-    unsigned short ushort;
+
 
     QDataStream in(&filed);
 
@@ -486,13 +485,12 @@ void apTool::on_processButton_clicked()
     Mat shim(size[1],size[0],CV_8UC3);
     Mat outlim(size[1],size[0],CV_8UC3);
     Mat normals(size[1],size[0],CV_8UC3);
+    Mat normals2(size[1],size[0],CV_8UC3);
+    normals2=Scalar::all(0);
     Mat albedo(size[1],size[0],CV_8UC1);
     Mat albedog(size[1],size[0],CV_8UC1);
     Mat albedob(size[1],size[0],CV_8UC1);
     std::vector<cv::Mat> albedos(3);
-
-   // Mat normals2(size[1],size[0],CV_8UC3);
-   // Mat normals3(size[1],size[0],CV_8UC3);
 
     Vec3f val;
     Vec3f dire;
@@ -1295,8 +1293,12 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
             }
     else{
         // 8 bit RGB
-        if(type==3)
+        if(type==3){
+
             for(int cc=0; cc<3;cc++) { // loop over colors
+
+
+
                 for(int j=0;j<size[1];j++)
                     for(int i=0;i<size[0];i++)
                     {
@@ -1376,10 +1378,6 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                             //   for (int k=0; k<nimg;k++)
                             //     if(shd[k]==0) ninl=ninl+1;
 
-
-
-                            //  idx[0];
-
                             if( ui->fitterMenu->currentIndex()==0 || ui->fitterMenu->currentIndex()==2) {
                                 L_uv=Mat::zeros(ninl,6,DataType<float>::type);
                                 b_l=Mat::zeros(ninl,1,CV_32FC1);
@@ -1458,8 +1456,7 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                                 if (cvIsNaN(sol_l.at<float>(k))==1){
                                     sol_l.at<float>(k)=0;
                                 }
-                               // else
-                                    //sol_l.at<float>(k)=sol_l.at<float>(k);
+
                             }
 
                             outcoef.write((char*)&sol_l.at<float>(0),sizeof(float));
@@ -1487,10 +1484,7 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
 
                                 she = she+4*sh[k];
 
-                                // 12
-
                                 thr= 12;
-
 
                                 if(ui->fitterMenu->currentIndex()==0)
                                     diffe = diffe-(sol_l.at<float>(0)*pow( dirs[k][0] ,2)
@@ -1507,21 +1501,22 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                                             +sol_l.at<float>(4)*(dirs[k][0] * dirs[k][1])
                                             +sol_l.at<float>(5));
 
-
                                 stand=stand+diffe*diffe;
-
 
                                 if(diffe>thr)
                                     speck=speck+4;
                                 if(diffe<-thr)
                                     shy=shy+4;
-
                             }
+
                             for(int k=0;k<3;k++)
                                 val[k]=speck;
+
                             him.at<Vec3b>(j,i)= val;
+
                             for(int k=0;k<3;k++)
                                 val[k]=shy;
+
                             shim.at<Vec3b>(j,i)= val;
 
 
@@ -1628,13 +1623,18 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
 
 
 
-                    }
 
+                    }
+            normals2=normals2+normals/3.0;
+            }
+            normals=normals2;
             albedos.at(2) = albedo;
             albedos.at(1) = albedog;
             albedos.at(0) = albedob;
-            }
-        if(type==4){ // 16 bit RGB
+
+
+    }
+    if(type==4){ // 16 bit RGB
 
             for(int cc=0; cc<3;cc++) { // loop over colors
                 for(int j=0;j<size[1];j++)
@@ -1945,16 +1945,14 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                         }
 
 
-
                     }
 
+                normals2=normals2+normals/3.0;
+                }
+                normals=normals2;
             albedos.at(2) = albedo;
             albedos.at(1) = albedog;
             albedos.at(0) = albedob;
-
-        }
-
-
     }
     } // end loop over colors
 
@@ -2067,7 +2065,7 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
 
         imwrite("normals.png",normals);
 
-  cv::Mat colorImage;
+          cv::Mat colorImage;
          cv::merge(albedos, colorImage);
         imwrite("albedo.png",colorImage);
         //imwrite("albedo.png",albedo);
@@ -2075,9 +2073,9 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
 
 
         cv::cvtColor(normals,normals, cv::COLOR_BGR2RGB);
-        cv::cvtColor(albedo, albedo, cv::COLOR_GRAY2BGR);
+        //cv::cvtColor(albedo, albedo, cv::COLOR_GRAY2BGR);
         if(ui->fitViewBox->currentIndex()==2){
-            iw->setImage(albedo);
+            iw->setImage(colorImage);
             iw->show();
         }
         if(ui->fitViewBox->currentIndex()==1){
@@ -2291,8 +2289,6 @@ void apTool::on_showButton_clicked()
 
     file.close();
 
-    unsigned char uchar;
-    unsigned short ushort;
 
     // Image for output
     Mat shownImg(size[1],size[0],CV_8UC3,cv::Scalar(0,0,0));
