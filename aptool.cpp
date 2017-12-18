@@ -2043,20 +2043,36 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
 
             savePTM_RGB(lastname,size[0],size[1]);
             cv::Mat colorImage;
-            cv::merge(albedos, colorImage);
-            imwrite("albedo.png",colorImage);
 
-            cv::cvtColor(colorImage, colorImage, cv::COLOR_BGR2RGB);
-            if(ui->fitViewBox->currentIndex()==2){
-                iw->setImage(colorImage);
+
+            if(ui->fitViewBox->currentIndex()==4){
+                iw->setImage(test);
                 iw->show();
             }
+            if(ui->fitViewBox->currentIndex()==3){
+                iw->setImage(outlim);
+                iw->show();
+            }
+
+           // cv::merge(albedos, colorImage);
+           // imwrite("albedo.png",colorImage);
+
+//            cv::cvtColor(colorImage, colorImage, cv::COLOR_BGR2RGB);
+//            if(ui->fitViewBox->currentIndex()==2){
+//                iw->setImage(colorImage);
+//                iw->show();
+//            }
     }
     if(ui->fitterMenu->currentIndex()==1  || ui->fitterMenu->currentIndex()==2){
 
         imwrite("normals.png",normals);
-        imwrite("albedo.png",albedo);
+
+  cv::Mat colorImage;
+         cv::merge(albedos, colorImage);
+        imwrite("albedo.png",colorImage);
+        //imwrite("albedo.png",albedo);
         ui->msgBox->setText("saved normals and albedo images");
+
 
         cv::cvtColor(normals,normals, cv::COLOR_BGR2RGB);
         cv::cvtColor(albedo, albedo, cv::COLOR_GRAY2BGR);
