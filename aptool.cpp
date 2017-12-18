@@ -319,6 +319,15 @@ void apTool::on_processButton_clicked()
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
         return;
 
+    QProgressDialog pdialog("Fitting model","",0,100,this);
+    pdialog.setWindowModality(Qt::WindowModal);
+    pdialog.setCancelButton(0);
+    pdialog.setValue(0);
+    pdialog.setWindowTitle("Progress Dialog");
+    pdialog.show();
+
+
+
     int type=0;
     int dirtype=0;
     int size[2]={0,0};
@@ -516,6 +525,8 @@ void apTool::on_processButton_clicked()
     pts.clear();
 
     for (int k=0; k < nimg; k++){
+
+
         elev.push_back(asin(dirs[k][2]));
         azim.push_back(atan2(dirs[k][1], dirs[k][0]));
 
@@ -677,7 +688,8 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
         for(int j=0;j<size[1];j++)
             for(int i=0;i<size[0];i++)
             {
-
+                pdialog.setValue(100*j/size[1]);
+                pdialog.update();
                 //            shmask[i][j] = 0;
 
                 if(dirtype==2) // interpolated dirs: estimate pixel-specific direction
@@ -1636,8 +1648,8 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                                 dirs[k][2]=dircoeffs[k][6]*i+dircoeffs[k][7]*j+dircoeffs[k][8];
                             }
 
-                        in.readRawData((char*)&vals[0], nimg);
-                        vector<unsigned char> vec (&vals[0], &vals[0]+nimg );
+                        in.readRawData((char*)&vals[0], 2*nimg);
+                        vector<unsigned short> vec (&vals[0], &vals[0]+nimg );
 
                         int l=0,ninl=0;
 
@@ -1662,10 +1674,9 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                                     L_uv.at<float>(k,3)=dirs[k][0];
                                     L_uv.at<float>(k,4)=dirs[k][1];
                                     L_uv.at<float>(k,5)=1;
-                                    if(type==4)
+
                                         b_l.at<float>(k)= vals[k]/256.0;
-                                    else if(type==3)
-                                        b_l.at<float>(k)= (float)valc[k];
+
 
                                 }
                             }
@@ -1679,10 +1690,8 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                                     L_uv.at<float>(k,4)=(dirs[k][0] * dirs[k][1]);
                                     L_uv.at<float>(k,5)=1;
 
-                                    if(type==4)
                                         b_l.at<float>(k)= vals[k]/256.0;
-                                    else if(type==3)
-                                        b_l.at<float>(k)= (float)valc[k];
+
                                 }
                             }
                             if(ui->fitterMenu->currentIndex()==1) {// PS
@@ -1729,10 +1738,9 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                                         L_uv.at<float>(k,3)=dirs[k][0];
                                         L_uv.at<float>(k,4)=dirs[k][1];
                                         L_uv.at<float>(k,5)=1;
-                                        if(type==4)
+
                                             b_l.at<float>(k)= vals[k]/256.0;
-                                        else if(type==3)
-                                            b_l.at<float>(k)= (float)valc[k];
+
                                         k=k+1;
 
                                     }
@@ -1749,10 +1757,8 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                                         L_uv.at<float>(k,4)=(dirs[k][0] * dirs[k][1]);
                                         L_uv.at<float>(k,5)=1;
 
-                                        if(type==4)
                                             b_l.at<float>(k)= vals[k]/256.0;
-                                        else if(type==3)
-                                            b_l.at<float>(k)= (float)valc[k];
+
                                         k=k+1;
                                     }
                             }
@@ -1765,10 +1771,9 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                                         L_uv.at<float>(k,1)=dirs[k][1];
                                         L_uv.at<float>(k,2)=dirs[k][2];
 
-                                        if(type==4)
+
                                             b_l.at<float>(k)= vals[k]/256.0;
-                                        else if(type==3)
-                                            b_l.at<float>(k)= (float)valc[k];
+
                                         k=k+1;
                                     }
                             }
@@ -1785,8 +1790,7 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                                 if (cvIsNaN(sol_l.at<float>(k))==1){
                                     sol_l.at<float>(k)=0;
                                 }
-                               // else
-                                    //sol_l.at<float>(k)=sol_l.at<float>(k);
+
                             }
 
                             outcoef.write((char*)&sol_l.at<float>(0),sizeof(float));
@@ -1807,14 +1811,10 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                             float speck=0, shy=0, she=0, stand=0;
                             float diffe,thr;
                             for (int k=0; k<nimg;k++){
-                                if(type==2)
+
                                     diffe= vals[k]/256.0;
-                                else
-                                    diffe = valc[k];
 
                                 she = she+4*sh[k];
-
-                                // 12
 
                                 thr= 12;
 
@@ -1888,17 +1888,13 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                             float diffe,thr;
 
                             for (int k=0; k<nimg;k++){
-                                if(type==2)
+
                                     diffe= vals[k]/256.0;
-                                else
-                                    diffe = valc[k];
 
                                 she = she+4*sh[k];
 
                                 thr=12;
-                                /*thr= 0.1*(sol_l.at<float>(0)*dirs[k][0]
-                                    +sol_l.at<float>(1)*dirs[k][1]
-                                    +sol_l.at<float>(2)*dirs[k][2]);*/
+
 
                                 diffe = diffe-(sol_l.at<float>(0)*dirs[k][0]
                                         +sol_l.at<float>(1)*dirs[k][1]
@@ -1956,13 +1952,6 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
             albedos.at(1) = albedog;
             albedos.at(0) = albedob;
 
-
-
-            qDebug() << "not implemented yet";
-
-
-
-
         }
 
 
@@ -1988,7 +1977,7 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
 
 //Tinsae HERE - if hsh save related .hsh file
 
-    if(type < 2){
+    if(type < 3){
     if(ui->fitterMenu->currentIndex()==0) {// convert saved coeffs to viewable ptm
         savePTM_LRGB(lastname,size[0],size[1],chroma_img);
 
@@ -2138,6 +2127,15 @@ void apTool::on_showButton_clicked()
 
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
         return;
+
+
+    QProgressDialog pdialog("Creating image","",0,100,this);
+    pdialog.setWindowModality(Qt::WindowModal);
+    pdialog.setCancelButton(0);
+    pdialog.setValue(0);
+    pdialog.setWindowTitle("Progress Dialog");
+    pdialog.show();
+
 
     int type=0;
     int dirtype=0;
@@ -2802,6 +2800,13 @@ void apTool::on_showButton_clicked()
 */
                         /*  Vec3f cc; cc[0] = 0.2126; cc[1] = 0.7152; cc[2] = 0.0722;*/
 
+                        if(ui->viewBox->currentIndex()==3){ // max
+                            for (size_t p = 0; p != idx.size(); ++p) {idx[p] = p; }
+                            sort (idx.begin (), idx.end (), compare_index<vector<unsigned char> &>(vec));
+                            mini = idx[0];
+                            maxi = idx[nimg-1];
+                            shownImg.at<Vec3b>(j,i)[cc] = vec[maxi];
+                        }
                         if(ui->viewBox->currentIndex()==0){ // median
 
                             for (size_t p = 0; p != idx.size(); ++p) {idx[p] = p; }
@@ -2878,7 +2883,135 @@ void apTool::on_showButton_clicked()
                             // for (int k=0; k<3; k++)
                             //     val[cc] = 3*col[cc]*res/(nc);
 
-                            shownImg.at<Vec3b>(j,i)[cc] = res;
+                            shownImg.at<Vec3b>(j,i)[cc] = std::min(255.0,res);
+
+                            /*//ORA BANALMENTE PRENDE LA DISTANZA, ORDINA e prende nearst neighbor
+                for(int k=0;k<vec.size();k++){
+                    float dv=(lx-dirs[k][0])*(lx-dirs[k][0])+(ly-dirs[k][1])*(ly-dirs[k][1])+(lz-dirs[k][2])*(lz-dirs[k][2]);
+                    dist.push_back(dv);
+                }
+
+                vector<size_t> iv(vec.size());
+                for (size_t p = 0; p != iv.size(); ++p) iv[p] = p;
+                sort (iv.begin (), iv.end (), compare_index<vector<float> &>(dist));
+                dist.clear();
+
+                float distvector[] = {(lx-dirs[iv[0]][0])*(lx-dirs[iv[0]][0])+(ly-dirs[iv[0]][1])*(ly-dirs[iv[0]][1])+(lz-dirs[iv[0]][2])*(lz-dirs[iv[0]][2]),
+                                      (lx-dirs[iv[1]][0])*(lx-dirs[iv[1]][0])+(ly-dirs[iv[1]][1])*(ly-dirs[iv[1]][1])+(lz-dirs[iv[1]][2])*(lz-dirs[iv[1]][2]),
+                                      (lx-dirs[iv[2]][0])*(lx-dirs[iv[2]][0])+(ly-dirs[iv[2]][1])*(ly-dirs[iv[2]][1])+(lz-dirs[iv[2]][2])*(lz-dirs[iv[2]][2])};
+                float distf = distvector[0]+distvector[1]+distvector[2];
+
+                val[0] = 0;
+                val[1] = 0;
+                val[2] = 0;
+
+                for(int k=0;k<3;k++){
+                    Vec3b col=image.at<Vec3b>(j,i);
+                    float nc = col[0]+col[1]+col[2];
+                   // float pv =(vec[iv[0]]*dist[iv[0]] + vec[iv[1]]*dist[iv[0]])/(dist[iv[0]]+dist[iv[1]]);
+                   // vec[iv[0]] è il nearest neighbor il resto sarebbe per
+                   // convertire a 8 bit e applicare la tinta (che forse non è corretta, ma non te ne preoccupare)
+                    for (int i = 0; i < 3; i++)
+                        val[k] = val[k] + (3*col[k]*vec[iv[i]]/(nc*256))*((distf-distvector[i])/distf);
+                }*/
+                        }
+                    }
+
+            } // end loop over colors
+
+        if(type==4) // 16 bit RGB
+            for(int cc=0; cc<3;cc++) { // loop over colors
+                for(int j=0;j<size[1];j++)
+                    for(int i=0;i<size[0];i++)
+                    {
+                        if(dirtype==2) // interpolated dirs: estimate pixel-specific direction
+                            for(int k=0;k<nimg;k++)
+                            {
+                                dirs[k][0]=dircoeffs[k][0]*i+dircoeffs[k][1]*j+dircoeffs[k][2];
+                                dirs[k][1]=dircoeffs[k][3]*i+dircoeffs[k][4]*j+dircoeffs[k][5];
+                                dirs[k][2]=dircoeffs[k][6]*i+dircoeffs[k][7]*j+dircoeffs[k][8];
+
+                                if(i==0 && j==0)
+                                    qDebug() << " 0,0 - " << dirs[k][0] << " " << dirs[k][1] << " "  << dirs[k][2];
+                                if(i==size[0]-1 && j==size[1]-1)
+                                    qDebug() << " end  - " << dirs[k][0] << " " << dirs[k][1] << " "  << dirs[k][2];
+                            }
+
+                        in.readRawData((char*)&vals[0], nimg*2);
+                        vector<unsigned short> vec (&vals[0], &vals[0]+nimg );
+                        int medi, mini, maxi;
+                        vector<int> shad;
+                        vector<int> shad2, tmpv;
+                        // 16 bit version,
+
+                        // read pixel data and do some processing. on this skeleton we can
+                        // develop fitters, estimate normals, detect shadows and edges, etc.
+
+                        float avg;
+                        vector<size_t> idx(vec.size());
+
+
+                        if(ui->viewBox->currentIndex()==3){ // max
+                            for (size_t p = 0; p != idx.size(); ++p) {idx[p] = p; }
+                            sort (idx.begin (), idx.end (), compare_index<vector<unsigned short> &>(vec));
+                            mini = idx[0];
+                            maxi = idx[nimg-1];
+                            shownImg.at<Vec3b>(j,i)[cc] = vec[maxi]/256.0;
+                        }
+                        if(ui->viewBox->currentIndex()==0){ // median
+
+                            for (size_t p = 0; p != idx.size(); ++p) {idx[p] = p; }
+                            sort (idx.begin (), idx.end (), compare_index<vector<unsigned short> &>(vec));
+
+                            mini = idx[0];
+                            maxi = idx[nimg-1];
+                            if((vec.size()/2) % 2 == 0)
+                                medi = idx[(vec.size())/2 + 1];
+                            else
+                                medi = idx[(vec.size())/2];
+
+                            shownImg.at<Vec3b>(j,i)[cc] = vec[medi]/256.0;
+
+
+                        }
+                        else if(ui->viewBox->currentIndex()==1){ // mean
+                            for (size_t p = 0; p != idx.size(); ++p) { avg=avg+vec[p];}
+                            avg /= vec.size();
+
+                            shownImg.at<Vec3b>(j,i)[cc] = avg/256.0;
+
+                        }
+                        else if(ui->viewBox->currentIndex()==2){ // directional
+
+                            int nen=7;
+
+                            if (flagInterp == false) {
+                                rbfcreate(2, 1, modelInterpolation);
+                                arrayInterpolation.setlength(nen, 3);
+
+
+                                for(int k1=0; k1<nen; k1++)
+                                    for(int k2=0; k2<2; k2++) {
+                                        arrayInterpolation(k1, k2) = dirs[iv[k1]][k2];
+                                    }
+
+                                flagInterp=true;
+                            }
+
+                            for(int k=0; k<nen; k++)
+                                arrayInterpolation(k, 2) = vec[iv[k]];
+
+
+                            rbfsetpoints(modelInterpolation, arrayInterpolation);
+                            float rr = ui->rbfSpinBox->value();
+                            rbfsetalgomultilayer(modelInterpolation, rr, 1, 10e-3);
+
+                            rbfbuildmodel(modelInterpolation, repInterpolation);
+
+                            double res = rbfcalc2(modelInterpolation, lx, ly);
+
+
+                            shownImg.at<Vec3b>(j,i)[cc] = std::min(255.0,res/256.0);
 
                             /*//ORA BANALMENTE PRENDE LA DISTANZA, ORDINA e prende nearst neighbor
                 for(int k=0;k<vec.size();k++){
@@ -2927,7 +3060,9 @@ void apTool::on_showButton_clicked()
         ui->msgBox->setText("Rbf interpolated image");
         ui->msgBox->append("Relighted from" + QString::number(lx) +  " " + QString::number(ly));
     }
-
+    if(ui->viewBox->currentIndex()==3){
+        ui->msgBox->setText("max image");
+    }
     iw->imageLabel->setPixmap(QPixmap::fromImage(QImage(shownImg.data,shownImg.cols,shownImg.rows,shownImg.step,QImage::Format_RGB888)));
 
     filed.close();

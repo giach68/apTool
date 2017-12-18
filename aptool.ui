@@ -202,6 +202,11 @@
        <string>directional</string>
       </property>
      </item>
+     <item>
+      <property name="text">
+       <string>max</string>
+      </property>
+     </item>
     </widget>
     <widget class="QPushButton" name="showButton">
      <property name="geometry">
