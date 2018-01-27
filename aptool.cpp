@@ -27,6 +27,49 @@ using namespace alglib;
 using namespace std;
 using namespace cv;
 
+float ReverseFloat( const float inFloat )
+{
+    float retVal;
+    char *floatToConvert = ( char* ) & inFloat;
+    char *returnFloat = ( char* ) & retVal;
+
+    // swap the bytes into a temporary buffer
+    returnFloat[0] = floatToConvert[3];
+    returnFloat[1] = floatToConvert[2];
+    returnFloat[2] = floatToConvert[1];
+    returnFloat[3] = floatToConvert[0];
+
+    return retVal;
+}
+
+static void getHSH(float theta, float phi, float* hweights, int order)
+{
+    float cosPhi = cos(phi);
+    float cosTheta = cos(theta);
+    float cosTheta2 = cosTheta * cosTheta;
+    hweights[0] = 1/sqrt(2*M_PI);
+    hweights[1] = sqrt(6/M_PI)      *  (cosPhi*sqrt(cosTheta-cosTheta2));
+    hweights[2] = sqrt(3/(2*M_PI))  *  (-1. + 2.*cosTheta);
+    hweights[3] = sqrt(6/M_PI)      *  (sqrt(cosTheta - cosTheta2)*sin(phi));
+    if (order >=2)
+    {
+        hweights[4] = sqrt(30/M_PI)     *  (cos(2.*phi)*(-cosTheta + cosTheta2));
+        hweights[5] = sqrt(30/M_PI)     *  (cosPhi*(-1. + 2.*cosTheta)*sqrt(cosTheta - cosTheta2));
+        hweights[6] = sqrt(5/(2*M_PI))  *  (1 - 6.*cosTheta + 6.*cosTheta2);
+        hweights[7] = sqrt(30/M_PI)     *  ((-1 + 2.*cosTheta)*sqrt(cosTheta - cosTheta2)*sin(phi));
+        hweights[8] = sqrt(30/M_PI)     *  ((-cosTheta + cosTheta2)*sin(2.*phi));
+    }
+    if (order >=3)
+    {
+        hweights[9]  = 2*sqrt(35/M_PI)	*	(cos(3.0*phi)*pow((cosTheta - cosTheta2), (float)1.5));
+        hweights[10] = sqrt(210/M_PI)	*	(cos(2.0*phi)*(-1 + 2*cosTheta)*(-cosTheta + cosTheta2));
+        hweights[11] = 2*sqrt(21/M_PI)  *	(cos(phi)*sqrt(cosTheta - cosTheta2)*(1 - 5*cosTheta + 5*cosTheta2));
+        hweights[12] = sqrt(7/(2*M_PI)) *	(-1 + 12*cosTheta - 30*cosTheta2 + 20*cosTheta2*cosTheta);
+        hweights[13] = 2*sqrt(21/M_PI)  *	(sqrt(cosTheta - cosTheta2)*(1 - 5*cosTheta + 5*cosTheta2)*sin(phi));
+        hweights[14] = sqrt(210/M_PI)  *	(-1 + 2*cosTheta)*(-cosTheta + cosTheta2)*sin(2*phi);
+        hweights[16] = 2*sqrt(35/M_PI)  *	pow((cosTheta - cosTheta2), (float)1.5)*sin(3*phi);
+    }
+}
 
 template<class T>struct compare_index
 {
@@ -39,6 +82,146 @@ template<class T>struct compare_index
     }
 };
 
+
+void saveRTI_LRGB(QString filename, int W, int H, int type, QString chroma_img){
+
+    char* files[16] = {"h0.bin","h1.bin","h2.bin","h3.bin","h4.bin","h5.bin","h6.bin","h7.bin","h8.bin","h9.bin","h10.bin","h11.bin","h12.bin","h13.bin","h14.bin","h15.bin"};
+    float* pBuff = new float[W*H];
+    double max[16], min[16];
+    float bias[16];
+    float scale[16];
+    unsigned char c;
+    unsigned char* scaledc = new unsigned char[W*H*4];
+
+    cv::Mat image;
+    image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
+
+    for (int i = 0; i < 4; i++){
+        ifstream coef (files[i], ios::in | ios::binary);
+
+        coef.read((char*)pBuff,W*H*sizeof(float));
+        min[i] = 99999999999;
+        max[i] = -99999999999;
+
+        for (int x= 0; x < W*H; x++)
+        {
+            if(pBuff[x] > max[i]) max[i]=pBuff[x];
+            if(pBuff[x] < min[i]) min[i]=pBuff[x];
+        }
+
+        scale[i]=(float) (max[i]-min[i]);
+        // scale[i]=(float) 1.0+floor((max[i]-min[i]-1)/256);
+        bias[i]=(float)(min[i]);// you can change this value
+        // delete(pBuff);
+        qDebug() <<"minmax "<<min[i]<< ' ' << max[i] <<'\n';
+        qDebug() <<"scale "<<float(scale[i])<<'\n';
+        qDebug() <<"bias "<<float(bias[i])<<'\n';
+        coef.close();
+    }
+
+    for (int i = 0; i < 4; i++){
+        qDebug(files[i]);
+        ifstream coef (files[i], ios::in | ios::binary);
+
+        coef.read((char*)pBuff,W*H*sizeof(float));
+        coef.close();
+        for (int x = 0;x<W; x++)
+            for (int y = 0; y <H; y++)
+            {
+                scaledc[x+y*W+W*H*i] = (unsigned char)((pBuff[y*W+x] - min[i])/scale[i]);
+
+            }
+
+    }
+    qDebug() << "scaledc " << scaledc[100] << " " << pBuff[100] << " " << pBuff[100]*scale[0]/bias[0];
+    ofstream outfile; //, testrgb;
+    outfile.open(filename.toLatin1(),ios::binary);
+    //  testrgb.open("testrgb.txt",ios::app);
+
+    int rtitype, cold,basisterms,basistype, elemsize;
+
+    rtitype=3;
+    cold=1; //color dimension
+    basisterms=4;
+    basistype=2;
+    elemsize=1;
+    /*********** header *********************************************/
+    outfile <<"#HSH1.2"<<"\n";
+    outfile <<rtitype<< "\n";
+    outfile<<W<<" "<< H<<" "<<cold<<"\n";
+    outfile<<basisterms<<" "<< basistype <<" "<< elemsize <<"\n";
+    /************** end header ********************/
+
+    outfile.write(( char *)&scale,4*sizeof(float));
+    outfile.write(( char *)&bias,4*sizeof(float));
+
+    qDebug() << "sb " << scale[1] << " " << bias[1];
+    //       for(int ii=0;ii<9;ii++){
+    //           float vrev= ReverseFloat( scale[ii] );
+    //            outfile.write(( char *)&vrev,sizeof(float));
+    //        }
+    //       for(int ii=0;ii<9;ii++){
+    //           float vrev= ReverseFloat( bias[ii] );
+    //            outfile.write(( char *)&vrev,sizeof(float));
+    //        }
+
+    if(!image.data)
+    {
+        outfile.close();
+        return;
+    }
+
+    float maxv, vv;
+    unsigned char mah;
+    for (int y = 0; y <H; y++)
+        for (int x = 0;x<W; x++){
+            for(int uu=0;uu<3;uu++)
+                for (int i = 0; i < 4; i++)
+                {
+                    c=scaledc[x+y*W+W*H*i] ;//scaledc[i].at<unsigned char>(x,y);
+
+                    outfile.write(( char *)&c,1);
+                }
+
+
+
+            //             Vec3b val=image.at<Vec3b>(y,x);
+
+            //             maxv=val[0];
+            //             for (int i = 1; i < 3; i++)
+            //                 if( val[i] > maxv ) maxv=val[i];
+
+            //             for (int i = 0; i < 3; i++){
+            //                 mah = (unsigned char) ((float)val[2-i]*255.0/maxv);
+            //                 outfile.write(( char *)&mah,1);
+            //         }
+
+        }
+
+
+
+    //     float maxv, vv;
+    //     unsigned char mah;
+    //     for (int y = H-1; y >=0; y--)
+    //         for (int x = 0;x<W; x++){
+    //             Vec3b val=image.at<Vec3b>(y,x);
+
+    //             maxv=val[0];
+    //             for (int i = 1; i < 3; i++)
+    //                 if(val[i] > maxv) maxv=val[i];
+
+    //             for (int i = 0; i < 3; i++){
+    //                 mah =(unsigned char) ((float)val[2-i]*255.0/maxv);
+    //                 outfile.write(( char *)&mah,1);
+    //             }
+    //         }
+
+
+    delete(scaledc);
+
+    outfile.close();
+
+}
 
 
 void savePTM_LRGB(QString filename, int W, int H, QString chroma_img){
@@ -168,16 +351,16 @@ void savePTM_RGB(QString filename, int W, int H){
     float scale[6*3];
     float* pBuff = new float[3*W*H];
 
-   for (int i = 0; i <= 17; i++){
-    min[i] = 99999999999;
-    max[i] = -99999999999;
-}
+    for (int i = 0; i <= 17; i++){
+        min[i] = 99999999999;
+        max[i] = -99999999999;
+    }
 
 
 
     for (int i = 0; i <= 5; i++){
         ifstream coef (files[i], ios::in | ios::binary);
-    //for (int k=0; k<3; k++){
+        //for (int k=0; k<3; k++){
         coef.read((char*)pBuff,3*W*H*sizeof(float));
 
 
@@ -185,35 +368,35 @@ void savePTM_RGB(QString filename, int W, int H){
         {
             if(pBuff[x] > max[i]) max[i]=pBuff[x];
             if(pBuff[x] < min[i]) min[i]=pBuff[x];
-         //   if(pBuff[x] > max[i*k+i]) max[i*k+i]=pBuff[x];
-         //   if(pBuff[x] < min[i*k+i]) min[i*k+i]=pBuff[x];
+            //   if(pBuff[x] > max[i*k+i]) max[i*k+i]=pBuff[x];
+            //   if(pBuff[x] < min[i*k+i]) min[i*k+i]=pBuff[x];
         }
 
-      coef.close();
-        }
+        coef.close();
+    }
 
-      //  }
+    //  }
 
- //  for (int k=0; k<3; k++){
+    //  for (int k=0; k<3; k++){
 
     for (int i = 0; i <= 5; i++){
-   scale[i]=(float) 1.0+floor((max[i]-min[i]-1)/256);
+        scale[i]=(float) 1.0+floor((max[i]-min[i]-1)/256);
         bias[i]=(int)(-min[i]/scale[i]);
-//        scale[i*k+i]=(float) 1.0+floor((max[i*k+i]-min[i*k+i]-1)/256);
-//        bias[i*k+i]=(int)(-min[i*k+i]/scale[i*k+i]);// you can change this value
+        //        scale[i*k+i]=(float) 1.0+floor((max[i*k+i]-min[i*k+i]-1)/256);
+        //        bias[i*k+i]=(int)(-min[i*k+i]/scale[i*k+i]);// you can change this value
         // delete(pBuff);
         qDebug() <<"minmax "<<min[i]<< ' ' << max[i] <<'\n';
         qDebug() <<"scale "<<int(scale[i])<<'\n';
         qDebug() <<"bias "<<int(bias[i])<<'\n';
 
     }
-//}
+    //}
 
     unsigned char c;
 
     unsigned char* scaledc = new unsigned char[W*H*6*3];
     unsigned char test;
-      float testf;
+    float testf;
 
     for (int i = 0; i <= 5; i++){
         ifstream coef (files[i], ios::in | ios::binary);
@@ -224,14 +407,14 @@ void savePTM_RGB(QString filename, int W, int H){
         //test=(unsigned char)((pBuff[50*W+500]/scale[i])+(float)bias[i]);
 
         //testf = (test-bias[i])*scale[i];
-       // qDebug() << i << " !!! " << pBuff[50*W+50] << " " << test << " " << testf;
+        // qDebug() << i << " !!! " << pBuff[50*W+50] << " " << test << " " << testf;
 
         for(int k=0;k<3;k++)
-        for (int x = 0;x<W; x++)
-            for (int y = 0; y <H; y++)
-            {
-                scaledc[x+y*W+i*W*H+k*6*W*H] = (unsigned char)((pBuff[k*W*H+y*W+x]/scale[i])+(float)bias[i]);
-            }
+            for (int x = 0;x<W; x++)
+                for (int y = 0; y <H; y++)
+                {
+                    scaledc[x+y*W+i*W*H+k*6*W*H] = (unsigned char)((pBuff[k*W*H+y*W+x]/scale[i])+(float)bias[i]);
+                }
 
 
         //delete(pBuff);
@@ -262,19 +445,19 @@ void savePTM_RGB(QString filename, int W, int H){
         num=QString::number((int)bias[i]);
         outfile << num.toStdString()<<' ';
     }outfile <<'\n';
-//}
+    //}
 
-  //    for (int k=0; k<3; k++){
+    //    for (int k=0; k<3; k++){
 
-for (int k=0; k<3; k++){
-    for (int y = H-1; y >=0; y--)
-        for (int x = 0;x<W; x++)
-            for (int i = 0; i < 6; i++)
-            {
-                c=scaledc[k*W*H*6+x+y*W+W*H*i] ;//scaledc[i].at<unsigned char>(x,y);
-                outfile.write(( char *)&c,1);
-            }
-}
+    for (int k=0; k<3; k++){
+        for (int y = H-1; y >=0; y--)
+            for (int x = 0;x<W; x++)
+                for (int i = 0; i < 6; i++)
+                {
+                    c=scaledc[k*W*H*6+x+y*W+W*H*i] ;//scaledc[i].at<unsigned char>(x,y);
+                    outfile.write(( char *)&c,1);
+                }
+    }
 }
 
 
@@ -306,9 +489,9 @@ void apTool::on_pushButton_clicked()
 
 void apTool::on_processButton_clicked()
 {
-// this is the code to fit models over AP data
-// AP types - variable type: 1 - Luminance char , 2 - luminance short , 3 RGB char, 4 RGB short, 0 error
-// direction info - variable dirtype: 1- constant 2 - interpolated
+    // this is the code to fit models over AP data
+    // AP types - variable type: 1 - Luminance char , 2 - luminance short , 3 RGB char, 4 RGB short, 0 error
+    // direction info - variable dirtype: 1- constant 2 - interpolated
 
     QString filename = ui->fileNameLine->text();
     QFile file(filename);
@@ -338,7 +521,7 @@ void apTool::on_processButton_clicked()
 
     // to output binary files with coefficients
     // Tinsae HERE - if more coeff add related output variable
-    ofstream outcoef, outcoef1, outcoef2, outcoef3, outcoef4, outcoef5;
+    ofstream outcoef, outcoef1, outcoef2, outcoef3, outcoef4, outcoef5, outcoef6, outcoef7, outcoef8, outcoef9, outcoef10, outcoef11,outcoef12, outcoef13, outcoef14, outcoef15, outcoef16;
 
     // read AP header
 
@@ -427,7 +610,7 @@ void apTool::on_processButton_clicked()
                     dirs[i][0]=dircoeffs[i][0]*c_x+dircoeffs[i][1]*c_y+dircoeffs[i][2];
                     dirs[i][1]=dircoeffs[i][3]*c_x+dircoeffs[i][4]*c_y+dircoeffs[i][5];
                     dirs[i][2]=dircoeffs[i][6]*c_x+dircoeffs[i][7]*c_y+dircoeffs[i][8];
-                   // qDebug() << dirs[i][0] << " " << dirs[i][1] << " "  << dirs[i][2];
+                    // qDebug() << dirs[i][0] << " " << dirs[i][1] << " "  << dirs[i][2];
 
 
                 }
@@ -479,6 +662,9 @@ void apTool::on_processButton_clicked()
     // now read and process appearance profiles
     vector<unsigned char> apuc;
     vector<unsigned short> apus;
+
+cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
+    //   cv::cvtColor(image,image, cv::COLOR_BGR2RGB);
 
     Mat test(size[1],size[0],CV_8UC3);
     Mat him(size[1],size[0],CV_8UC3);
@@ -540,7 +726,7 @@ void apTool::on_processButton_clicked()
         xx.push_back(po.r);
         yy.push_back(po.c);
 
-        for (int l=0; l<nimg;l++){
+        for (int l=0; l<nimg;l++){ // dp difference sqrt(1-(dk*dl)^2)= sin alpha
             dp[k][l] = sqrt(1-(dirs[k][0]*dirs[l][0]+
                     dirs[k][1]*dirs[l][1]+
                     dirs[k][2]*dirs[l][2])*(dirs[k][0]*dirs[l][0]+
@@ -588,34 +774,34 @@ void apTool::on_processButton_clicked()
     int nx2 = de_duplicateX( pt, outx2, ptt);
 
     int t2 = s_hull_pro( ptt, triad2);
-// triangulation in the second space
+    // triangulation in the second space
 
     /* Test saving light points triangulation (works!)*/
-if(0){
-    ofstream om;
+    if(0){
+        ofstream om;
 
-    om.open ("mesh.off");
-    om << "OFF\n";
-    om << pts.size() << " " << triads.size() << " " << "\n";
+        om.open ("mesh.off");
+        om << "OFF\n";
+        om << pts.size() << " " << triads.size() << " " << "\n";
 
-    for(int ii=0;ii<pts.size();ii++){
-         om << " " << elev[inds[ii]] << " " << azim[inds[ii]] << " 0 \n";
-       }
+        for(int ii=0;ii<pts.size();ii++){
+            om << " " << elev[inds[ii]] << " " << azim[inds[ii]] << " 0 \n";
+        }
 
-    for( size_t i = 0; i < triads.size(); i++ )
-    {
+        for( size_t i = 0; i < triads.size(); i++ )
+        {
 
-        om << "3 " << triads[i].a <<  " " << triads[i].b << " " << triads[i].c << endl;
+            om << "3 " << triads[i].a <<  " " << triads[i].b << " " << triads[i].c << endl;
 
+        }
+        om.close();
     }
-    om.close();
-}
     unsigned char nema[nimg][nimg];
     for (int i=0;i<nimg;i++)
         for (int j=0;j<nimg;j++)
             nema[i][j]=0;
 
-  // adjacency matrix for vertices
+    // adjacency matrix for vertices
     for( size_t i = 0; i < triads.size(); i++ )
     {
         nema[triads[i].a][triads[i].b]=1;
@@ -623,7 +809,7 @@ if(0){
         nema[triads[i].b][triads[i].c]=1;
         nema[triads[i].c][triads[i].b]=1;
         nema[triads[i].c][triads[i].a]=1;
-        nema[triads[i].a][triads[i].c]=1;  
+        nema[triads[i].a][triads[i].c]=1;
     }
 
 
@@ -649,40 +835,57 @@ if(0){
     vector<size_t> idx(nimg);
 
 
- //   Tinsae HERE - add case for HSH with names like h1.bin, etc.
+    //   Tinsae HERE - add case for HSH with names like h1.bin, etc.
 
-if( ui->fitterMenu->currentIndex()==0){
-    outcoef.open ("ptmC1.bin", ios::out | ios::binary);
-    outcoef1.open ("ptmC2.bin", ios::out | ios::binary);
-    outcoef2.open ("ptmC3.bin", ios::out | ios::binary);
-    outcoef3.open ("ptmC4.bin", ios::out | ios::binary);
-    outcoef4.open ("ptmC5.bin", ios::out | ios::binary);
-    outcoef5.open ("ptmC6.bin", ios::out | ios::binary);
-}
-if(ui->fitterMenu->currentIndex()==2){
-    outcoef.open ("DrewPtmC1.bin", ios::out | ios::binary);
-    outcoef1.open ("DrewPtmC2.bin", ios::out | ios::binary);
-    outcoef2.open ("DrewPtmC3.bin", ios::out | ios::binary);
-    outcoef3.open ("DrewPtmC4.bin", ios::out | ios::binary);
-    outcoef4.open ("DrewPtmC5.bin", ios::out | ios::binary);
-    outcoef5.open ("DrewPtmC6.bin", ios::out | ios::binary);
-}
-if(ui->fitterMenu->currentIndex()==1){
-    outcoef.open ("albedo.bin", ios::out | ios::binary);
-    outcoef1.open ("nx.bin", ios::out | ios::binary);
-    outcoef2.open ("ny.bin", ios::out | ios::binary);
-    outcoef3.open ("nz.bin", ios::out | ios::binary);
-}
+    if( ui->fitterMenu->currentIndex()==0){
+        outcoef.open ("ptmC1.bin", ios::out | ios::binary);
+        outcoef1.open ("ptmC2.bin", ios::out | ios::binary);
+        outcoef2.open ("ptmC3.bin", ios::out | ios::binary);
+        outcoef3.open ("ptmC4.bin", ios::out | ios::binary);
+        outcoef4.open ("ptmC5.bin", ios::out | ios::binary);
+        outcoef5.open ("ptmC6.bin", ios::out | ios::binary);
+    }
+    if(ui->fitterMenu->currentIndex()==2){
+        outcoef.open ("DrewPtmC1.bin", ios::out | ios::binary);
+        outcoef1.open ("DrewPtmC2.bin", ios::out | ios::binary);
+        outcoef2.open ("DrewPtmC3.bin", ios::out | ios::binary);
+        outcoef3.open ("DrewPtmC4.bin", ios::out | ios::binary);
+        outcoef4.open ("DrewPtmC5.bin", ios::out | ios::binary);
+        outcoef5.open ("DrewPtmC6.bin", ios::out | ios::binary);
+    }
+    if(ui->fitterMenu->currentIndex()==1){
+        outcoef.open ("albedo.bin", ios::out | ios::binary);
+        outcoef1.open ("nx.bin", ios::out | ios::binary);
+        outcoef2.open ("ny.bin", ios::out | ios::binary);
+        outcoef3.open ("nz.bin", ios::out | ios::binary);
+    }
 
+    if(ui->fitterMenu->currentIndex()==3) {
+        outcoef.open ("h0.bin", ios::out | ios::binary);
+        outcoef1.open ("h1.bin", ios::out | ios::binary);
+        outcoef2.open ("h2.bin", ios::out | ios::binary);
+        outcoef3.open ("h3.bin", ios::out | ios::binary);
+        outcoef4.open ("h4.bin", ios::out | ios::binary);
+        outcoef5.open ("h5.bin", ios::out | ios::binary);
+        outcoef6.open ("h6.bin", ios::out | ios::binary);
+        outcoef7.open ("h7.bin", ios::out | ios::binary);
+        outcoef8.open ("h8.bin", ios::out | ios::binary);
+        outcoef9.open ("h9.bin", ios::out | ios::binary);
+        outcoef10.open ("h10.bin", ios::out | ios::binary);
+        outcoef11.open ("h11.bin", ios::out | ios::binary);
+        outcoef12.open ("h12.bin", ios::out | ios::binary);
+        outcoef13.open ("h13.bin", ios::out | ios::binary);
+        outcoef14.open ("h14.bin", ios::out | ios::binary);
+        outcoef15.open ("h15.bin", ios::out | ios::binary);
+    }
 
-if(ui->fitterMenu->currentIndex()==3) {return; }// HSH to be implemented}
-if(ui->fitterMenu->currentIndex()==4) {return; } // DMD}
-if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
+    if(ui->fitterMenu->currentIndex()==4) {return; } // DMD
+    if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm
 
-
+    qDebug() << "type " << type;
     // loop over APA pixel blocks
 
-    if(type <3)   // if Luminance types, only 1 channel
+    if(type <3) {  // if Luminance types, only 1 channel
         for(int j=0;j<size[1];j++)
             for(int i=0;i<size[0];i++)
             {
@@ -696,12 +899,8 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                         dirs[k][0]=dircoeffs[k][0]*i+dircoeffs[k][1]*j+dircoeffs[k][2];
                         dirs[k][1]=dircoeffs[k][3]*i+dircoeffs[k][4]*j+dircoeffs[k][5];
                         dirs[k][2]=dircoeffs[k][6]*i+dircoeffs[k][7]*j+dircoeffs[k][8];
-
-//                        if(i==0 && j==0)
-//                            qDebug() << " 0,0 - " << dirs[k][0] << " " << dirs[k][1] << " "  << dirs[k][2];
-//                        if(i==size[0]-1 && j==size[1]-1)
-//                            qDebug() << " end  - " << dirs[k][0] << " " << dirs[k][1] << " "  << dirs[k][2];
                     }
+
                 // 8 bit
                 if(type==1){
                     in.readRawData((char*)&valc[0], nimg);
@@ -709,7 +908,6 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                     int medi, mini, maxi;
                     vector<int> shad;
                     vector<int> shad2, tmpv;
-                    //
 
                     vector<int> inli;
                     int out;
@@ -729,8 +927,8 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                     for (int p = 0; p < idx.size(); p++) {
                         hl[p]=il[p]=sh[p]=0;
                         shd[p]=0;
-                        //   qDebug() << vec[idx[p]];
                     }
+
                     // highlights as saturated pixels?
                     for(int k=nimg-1; vec[idx[k]]>0.8*255; k--){nhi++;
                         hl[idx[k]]=1;
@@ -791,8 +989,8 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
 
 
                 } // end 8 bit
-                // 16 bit
-                if(type==2){
+
+                if(type==2){   // 16 bit
 
                     // read pixel data and do some processing. on this skeleton we can
                     // develop fitters, estimate normals, detect shadows and edges, etc.
@@ -805,8 +1003,6 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                     vector<int> inli;
 
                     int out;
-
-
 
                     for (size_t p = 0; p != idx.size(); ++p) idx[p] = p;
                     sort (idx.begin (), idx.end (), compare_index<vector<unsigned short> &>(vec));
@@ -975,7 +1171,7 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                 int l=0,ninl=0;
 
                 // fit full set
-               // Tinsae HERE - add hsh case allocating 9 or 16 values for Luv
+                // Tinsae HERE - add hsh case allocating 9 or 16 values for Luv
 
                 if(ui->robustMenu->currentIndex()==0 ){ // full set: take all the light directons
 
@@ -989,8 +1185,8 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                         b_l=Mat::zeros(nimg,1,CV_32FC1);
                     }
 
-                    if(ui->fitterMenu->currentIndex()==3){//hsh
-                        L_uv=Mat::zeros(nimg,9,DataType<float>::type);
+                    if(ui->fitterMenu->currentIndex()==3){//hsh 16
+                        L_uv=Mat::zeros(nimg,16,DataType<float>::type);
                         b_l=Mat::zeros(nimg,1,CV_32FC1);
                     }
 
@@ -1039,11 +1235,30 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                                 b_l.at<float>(k)= (float)valc[k];
                         }
                     }
-                     if(ui->fitterMenu->currentIndex()==3) {// HSH
-                        // Tinsae HERE - add evaluation
-                     }
 
-                } else if( ui->robustMenu->currentIndex()==1 ){
+                    if(ui->fitterMenu->currentIndex()==3) {// HSH
+                        for (int k=0; k<nimg;k++){
+                            float theta=acos(sqrt(1-pow( dirs[k][0] ,2) - pow( dirs[k][1] ,2) )); //angle theta
+                            float phi=atan2(dirs[k][0],dirs[k][1]);
+                            float hweights[16];
+                            float chweights[16];
+
+                            getHSH(theta, phi, hweights, 3);
+
+                            for(int t=0;t<16;t++){
+                                L_uv.at<float>(k,t)=hweights[t];
+                                //qDebug() << chweights[t];
+                            }
+                            if(type==2)
+                                b_l.at<float>(k)= vals[k]/256.0;
+                            else if(type==1)
+                                b_l.at<float>(k)= (float)valc[k];
+                        }
+                    }
+
+
+                }
+                else if( ui->robustMenu->currentIndex()==1 ){  // Trimmed
 
                     // trimmed fit
                     ninl=nimg-8;
@@ -1060,21 +1275,26 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                         b_l=Mat::zeros(ninl,1,CV_32FC1);
                     }
 
+                    if(ui->fitterMenu->currentIndex()==3){//hsh 16
+                        L_uv=Mat::zeros(ninl,16,DataType<float>::type);
+                        b_l=Mat::zeros(ninl,1,CV_32FC1);
+                    }
+
                     if(ui->fitterMenu->currentIndex()==0) {// standard PTM
                         int k=0;
                         for (int p=0; p<nimg;p++)
                             if(idx[p] >3 && idx[p] < nimg-4 )
                             {
-                                L_uv.at<float>(k,0)=pow( dirs[k][0] ,2);
-                                L_uv.at<float>(k,1)=pow( dirs[k][1],2);
-                                L_uv.at<float>(k,2)=(dirs[k][0] * dirs[k][1]);
-                                L_uv.at<float>(k,3)=dirs[k][0];
-                                L_uv.at<float>(k,4)=dirs[k][1];
+                                L_uv.at<float>(k,0)=pow( dirs[idx[p]][0] ,2);
+                                L_uv.at<float>(k,1)=pow( dirs[idx[p]][1],2);
+                                L_uv.at<float>(k,2)=(dirs[idx[p]][0] * dirs[idx[p]][1]);
+                                L_uv.at<float>(k,3)=dirs[idx[p]][0];
+                                L_uv.at<float>(k,4)=dirs[idx[p]][1];
                                 L_uv.at<float>(k,5)=1;
                                 if(type==2)
-                                    b_l.at<float>(k)= vals[k]/256.0;
+                                    b_l.at<float>(k)= vals[idx[p]]/256.0;
                                 else if(type==1)
-                                    b_l.at<float>(k)= (float)valc[k];
+                                    b_l.at<float>(k)= (float)valc[idx[p]];
                                 k=k+1;
 
                             }
@@ -1084,17 +1304,17 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                         int k=0;
                         for (int p=0; p<nimg;p++)
                             if(idx[p] >3 && idx[p] < nimg-4 ){
-                                L_uv.at<float>(k,0)=dirs[k][0];
-                                L_uv.at<float>(k,1)=dirs[k][1];
-                                L_uv.at<float>(k,2)=dirs[k][2];
-                                L_uv.at<float>(k,3)=pow( dirs[k][0] ,2);
-                                L_uv.at<float>(k,4)=(dirs[k][0] * dirs[k][1]);
+                                L_uv.at<float>(k,0)=dirs[idx[p]][0];
+                                L_uv.at<float>(k,1)=dirs[idx[p]][1];
+                                L_uv.at<float>(k,2)=dirs[idx[p]][2];
+                                L_uv.at<float>(k,3)=pow( dirs[idx[p]][0] ,2);
+                                L_uv.at<float>(k,4)=(dirs[idx[p]][0] * dirs[idx[p]][1]);
                                 L_uv.at<float>(k,5)=1;
 
                                 if(type==2)
-                                    b_l.at<float>(k)= vals[k]/256.0;
+                                    b_l.at<float>(k)= vals[idx[p]]/256.0;
                                 else if(type==1)
-                                    b_l.at<float>(k)= (float)valc[k];
+                                    b_l.at<float>(k)= (float)valc[idx[p]];
                                 k=k+1;
                             }
                     }
@@ -1103,23 +1323,138 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                         int k=0;
                         for (int p=0; p<nimg;p++)
                             if(idx[p] >3 && idx[p] < nimg-4 ){
-                                L_uv.at<float>(k,0)=dirs[k][0];
-                                L_uv.at<float>(k,1)=dirs[k][1];
-                                L_uv.at<float>(k,2)=dirs[k][2];
+                                L_uv.at<float>(k,0)=dirs[idx[p]][0];
+                                L_uv.at<float>(k,1)=dirs[idx[p]][1];
+                                L_uv.at<float>(k,2)=dirs[idx[p]][2];
+
+                                if(type==2)
+                                    b_l.at<float>(k)= vals[idx[p]]/256.0;
+                                else if(type==1)
+                                    b_l.at<float>(k)= (float)valc[idx[p]];
+                                k=k+1;
+                            }
+                    }
+                    //
+                    if(ui->fitterMenu->currentIndex()==3) {// HSH
+                        for (int k=0; k<nimg-8;k++){
+                            float theta=acos(sqrt(1-pow( dirs[idx[k]][0] ,2) - pow( dirs[idx[k]][1] ,2) )); //angle theta
+                            float phi=atan2(dirs[idx[k]][0],dirs[idx[k]][1]);
+                            float hweights[16];
+                            float chweights[16];
+
+                            getHSH(theta, phi, hweights, 3);
+
+                            for(int t=0;t<16;t++){
+                                L_uv.at<float>(k,t)=hweights[t];
+                            }
+                            if(type==2)
+                                b_l.at<float>(k)= vals[idx[k]]/256.0;
+                            else if(type==1)
+                                b_l.at<float>(k)= (float)valc[idx[k]];
+                        }
+                    }
+                    if(ui->fitterMenu->currentIndex()==4) {}// DMD
+                    if(ui->fitterMenu->currentIndex()==5) {}// 3 order ptm
+                }
+
+                else if(ui->robustMenu->currentIndex()==3 ){ // TEST: removed vs relighted
+
+                    if( ui->fitterMenu->currentIndex()==0 || ui->fitterMenu->currentIndex()==2) {
+                        L_uv=Mat::zeros(nimg-1,6,DataType<float>::type);
+                        b_l=Mat::zeros(nimg-1,1,CV_32FC1);
+                    }
+
+                    if(ui->fitterMenu->currentIndex()==1){//PS
+                        L_uv=Mat::zeros(nimg-1,3,DataType<float>::type);
+                        b_l=Mat::zeros(nimg-1,1,CV_32FC1);
+                    }
+
+                    if(ui->fitterMenu->currentIndex()==3){//hsh
+                        L_uv=Mat::zeros(nimg-1,16,DataType<float>::type);
+                        b_l=Mat::zeros(nimg-1,1,CV_32FC1);
+                    }
+
+                    if(ui->fitterMenu->currentIndex()==0) {// standard PTM
+                        int k=0;
+                        for (int kk=0; kk<nimg;kk++){
+                            if(kk!=ui->spinBox->value()){
+                                L_uv.at<float>(k,0)=pow( dirs[kk][0] ,2);
+                                L_uv.at<float>(k,1)=pow( dirs[kk][1],2);
+                                L_uv.at<float>(k,2)=(dirs[kk][0] * dirs[kk][1]);
+                                L_uv.at<float>(k,3)=dirs[kk][0];
+                                L_uv.at<float>(k,4)=dirs[kk][1];
+                                L_uv.at<float>(k,5)=1;
+                                if(type==2)
+                                    b_l.at<float>(k)= vals[kk]/256.0;
+                                else if(type==1)
+                                    b_l.at<float>(k)= (float)valc[kk];
+                                k++;
+                            }
+                        }
+                    }
+                    if(ui->fitterMenu->currentIndex()==2) {// Drews PTM
+
+                        int k=0;
+                        for (int kk=0; kk<nimg;kk++)
+                            if(kk!=ui->spinBox->value()){
+
+                                L_uv.at<float>(k,0)=dirs[kk][0];
+                                L_uv.at<float>(k,1)=dirs[kk][1];
+                                L_uv.at<float>(k,2)=dirs[kk][2];
+                                L_uv.at<float>(k,3)=pow( dirs[kk][0] ,2);
+                                L_uv.at<float>(k,4)=(dirs[kk][0] * dirs[kk][1]);
+                                L_uv.at<float>(k,5)=1;
 
                                 if(type==2)
                                     b_l.at<float>(k)= vals[k]/256.0;
                                 else if(type==1)
                                     b_l.at<float>(k)= (float)valc[k];
-                                k=k+1;
+                                k++;
                             }
                     }
-// to be added
-                    if(ui->fitterMenu->currentIndex()==3) {}// HSH
-                    if(ui->fitterMenu->currentIndex()==4) {}// DMD
-                    if(ui->fitterMenu->currentIndex()==5) {}// 3 order ptm
-                }
+                    if(ui->fitterMenu->currentIndex()==1) {// PS
 
+                        int k=0;
+                        for (int kk=0; kk<nimg;kk++)
+                            if(kk!=ui->spinBox->value()){
+                                L_uv.at<float>(k,0)=dirs[kk][0];
+                                L_uv.at<float>(k,1)=dirs[kk][1];
+                                L_uv.at<float>(k,2)=dirs[kk][2];
+
+                                if(type==2)
+                                    b_l.at<float>(k)= vals[kk]/256.0;
+                                else if(type==1)
+                                    b_l.at<float>(k)= (float)valc[kk];
+                                k++;
+                            }
+                    }
+
+                    if(ui->fitterMenu->currentIndex()==3) {// HSH
+                        //
+                        int k=0;
+                        for (int kk=0; kk<nimg; kk++)
+                            if(kk!=ui->spinBox->value()){
+                                float theta=acos(sqrt(1-pow( dirs[kk][0] ,2) - pow( dirs[kk][1] ,2) )); //angle theta
+                                float phi=atan2(dirs[kk][0],dirs[kk][1]);
+                                float hweights[16];
+                                float chweights[16];
+
+                                getHSH(theta, phi, hweights, 3);
+
+                                for(int t=0;t<16;t++){
+                                    L_uv.at<float>(k,t)=hweights[t];
+                                    //qDebug() << chweights[t];
+                                }
+                                if(type==2)
+                                    b_l.at<float>(k)= vals[kk]/256.0;
+                                else if(type==1)
+                                    b_l.at<float>(k)= (float)valc[kk];
+                                k++;
+                            }
+                    }
+
+
+                }
 
                 solve(L_uv, b_l, sol_l, DECOMP_SVD);
                 L_uv.release();
@@ -1130,76 +1465,112 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                         if (cvIsNaN(sol_l.at<float>(k))==1){
                             sol_l.at<float>(k)=0;
                         }
-                       // else
-                          //  sol_l.at<float>(k)=sol_l.at<float>(k);??
-                    }
-
-                    outcoef.write((char*)&sol_l.at<float>(0),sizeof(float));
-                    outcoef1.write((char*)&sol_l.at<float>(1),sizeof(float));
-                    outcoef2.write((char*)&sol_l.at<float>(2),sizeof(float));
-                    outcoef3.write((char*)&sol_l.at<float>(3),sizeof(float));
-                    outcoef4.write((char*)&sol_l.at<float>(4),sizeof(float));
-                    outcoef5.write((char*)&sol_l.at<float>(5),sizeof(float));
-
-                    albedo.at<unsigned char>(j,i) = (unsigned char)sol_l.at<float>(5);
-
-                    float speck=0, shy=0, she=0, stand=0;
-                    float diffe,thr;
-                    for (int k=0; k<nimg;k++){
-                        if(type==2)
-                            diffe= vals[k]/256.0;
-                        else
-                            diffe = valc[k];
-
-                        she = she+4*sh[k];
-
-                        // 12
-
-                        thr= 12;
-
-
-                        if(ui->fitterMenu->currentIndex()==0)
-                            diffe = diffe-(sol_l.at<float>(0)*pow( dirs[k][0] ,2)
-                                    +sol_l.at<float>(1)*pow( dirs[k][1],2)
-                                    +sol_l.at<float>(2)*(dirs[k][0] * dirs[k][1])
-                                    +sol_l.at<float>(3)*dirs[k][0]
-                                    +sol_l.at<float>(4)*dirs[k][1]
-                                    +sol_l.at<float>(5));
-                        else
-                            diffe = diffe-(sol_l.at<float>(0)*dirs[k][0]
-                                    +sol_l.at<float>(1)*dirs[k][1]
-                                    +sol_l.at<float>(2)*dirs[k][2]
-                                    +sol_l.at<float>(3)*pow( dirs[k][0] ,2)
-                                    +sol_l.at<float>(4)*(dirs[k][0] * dirs[k][1])
-                                    +sol_l.at<float>(5));
-
-
-                        stand=stand+diffe*diffe;
-
-
-                        if(diffe>thr)
-                            speck=speck+4;
-                        if(diffe<-thr)
-                            shy=shy+4;
 
                     }
-                    for(int k=0;k<3;k++)
-                        val[k]=speck;
-                    him.at<Vec3b>(j,i)= val;
-                    for(int k=0;k<3;k++)
-                        val[k]=shy;
-                    shim.at<Vec3b>(j,i)= val;
+
+                    // save coeffs
+                                            outcoef.write((char*)&sol_l.at<float>(0),sizeof(float));
+                                            outcoef1.write((char*)&sol_l.at<float>(1),sizeof(float));
+                                            outcoef2.write((char*)&sol_l.at<float>(2),sizeof(float));
+                                            outcoef3.write((char*)&sol_l.at<float>(3),sizeof(float));
+                                            outcoef4.write((char*)&sol_l.at<float>(4),sizeof(float));
+                                            outcoef5.write((char*)&sol_l.at<float>(5),sizeof(float));
+                }
+
+                if(ui->fitterMenu->currentIndex()==2){ // DREW
+                     float nf = sqrt(sol_l.at<float>(0)*sol_l.at<float>(0)+sol_l.at<float>(1)*sol_l.at<float>(1)+sol_l.at<float>(2)*sol_l.at<float>(2));
+
+                     for(int k=0;k<3;k++)
+                         val[2-k] = 255*0.5*(1+sol_l.at<float>(k)/nf);
+
+                     normals.at<Vec3b>(j,i) = val;
+                     albedo.at<unsigned char>(j,i) = 0.6*nf;
+                     //qDebug() << val[2] << " ----- " << albedo.at<unsigned char>(j,i);
+                 }
 
 
-                    for(int k=0;k<3;k++)
-                        val[k]=25*sqrt(stand)/nimg;
+                if(ui->fitterMenu->currentIndex()==0 ) {// PTM
+                    //relight
+                    float reva;
+                    int kk= ui->spinBox->value();
+                    if(ui->robustMenu->currentIndex()==3){
+                        reva = sol_l.at<float>(0)*pow( dirs[kk][0] ,2)+
+                                sol_l.at<float>(1)*pow( dirs[kk][1],2)+
+                                sol_l.at<float>(2)*(dirs[kk][0] * dirs[kk][1])+
+                                sol_l.at<float>(3)*dirs[kk][0]+
+                                sol_l.at<float>(4)*dirs[kk][1]+
+                                sol_l.at<float>(5);
 
-                    test.at<Vec3b>(j,i)= val;
+                        Vec3b col=image.at<Vec3b>(j,i);
+                        float nc = col[0]+col[1]+col[2];
+                        for(int k=0;k<3;k++){
+                            val[k] = 3*col[k]*reva/(nc);
+                        }
+                        test.at<Vec3b>(j,i)= val;
+                    }
+                    else {
 
-                    for(int k=0;k<3;k++)
-                        val[k]=speck+shy;
+                        albedo.at<unsigned char>(j,i) = (unsigned char)sol_l.at<float>(5);
 
-                    outlim.at<Vec3b>(j,i)= val;
+                        float speck=0, shy=0, she=0, stand=0;
+                        float diffe,thr;
+                        for (int k=0; k<nimg;k++){
+                            if(type==2)
+                                diffe= vals[k]/256.0;
+                            else
+                                diffe = valc[k];
+
+                            she = she+4*sh[k];
+
+                            // 12
+
+                            thr= 12;
+
+
+                            if(ui->fitterMenu->currentIndex()==0)
+                                diffe = diffe-(sol_l.at<float>(0)*pow( dirs[k][0] ,2)
+                                        +sol_l.at<float>(1)*pow( dirs[k][1],2)
+                                        +sol_l.at<float>(2)*(dirs[k][0] * dirs[k][1])
+                                        +sol_l.at<float>(3)*dirs[k][0]
+                                        +sol_l.at<float>(4)*dirs[k][1]
+                                        +sol_l.at<float>(5));
+                            else
+                                diffe = diffe-(sol_l.at<float>(0)*dirs[k][0]
+                                        +sol_l.at<float>(1)*dirs[k][1]
+                                        +sol_l.at<float>(2)*dirs[k][2]
+                                        +sol_l.at<float>(3)*pow( dirs[k][0] ,2)
+                                        +sol_l.at<float>(4)*(dirs[k][0] * dirs[k][1])
+                                        +sol_l.at<float>(5));
+
+
+                            stand=stand+diffe*diffe;
+
+
+                            if(diffe>thr)
+                                speck=speck+4;
+                            if(diffe<-thr)
+                                shy=shy+4;
+
+                        }
+                        for(int k=0;k<3;k++)
+                            val[k]=speck;
+                        him.at<Vec3b>(j,i)= val;
+                        for(int k=0;k<3;k++)
+                            val[k]=shy;
+                        shim.at<Vec3b>(j,i)= val;
+
+
+                        for(int k=0;k<3;k++)
+                            val[k]=25*sqrt(stand)/nimg;
+
+                        test.at<Vec3b>(j,i)= val;
+
+                        for(int k=0;k<3;k++)
+                            val[k]=speck+shy;
+
+                        outlim.at<Vec3b>(j,i)= val;
+                    }
+
 
                 }
                 else if(ui->fitterMenu->currentIndex()==1){ //PS
@@ -1217,7 +1588,7 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                     coe=sol_l.at<float>(2)/nf;
                     outcoef3.write((char*)&coe,sizeof(float));
 
-               /*     outcoef1.write((char*)&sol_l.at<float>(1),sizeof(float));
+                    /*     outcoef1.write((char*)&sol_l.at<float>(1),sizeof(float));
                     outcoef2.write((char*)&sol_l.at<float>(2),sizeof(float));
                     outcoef3.write((char*)&sol_l.at<float>(2),sizeof(float));*/
 
@@ -1276,32 +1647,68 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                     outlim.at<Vec3b>(j,i)= val;
 
                 }
+                else if(ui->fitterMenu->currentIndex()==3){ //HSH
 
-                if(ui->fitterMenu->currentIndex()==2){
-                    float nf = sqrt(sol_l.at<float>(0)*sol_l.at<float>(0)+sol_l.at<float>(1)*sol_l.at<float>(1)+sol_l.at<float>(2)*sol_l.at<float>(2));
+                    //relight
+                    float reva;
+                    int kk= ui->spinBox->value();
 
-                    for(int k=0;k<3;k++)
-                        val[2-k] = 255*0.5*(1+sol_l.at<float>(k)/nf);
+                    float theta=acos(sqrt(1-pow( dirs[kk][0] ,2) - pow( dirs[kk][1] ,2) )); //angle theta
+                    float phi=atan2(dirs[kk][0],dirs[kk][1]);
+                    float hweights[16];
+                    getHSH(theta, phi, hweights, 3);
 
-                    normals.at<Vec3b>(j,i) = val;
-                    albedo.at<unsigned char>(j,i) = 0.6*nf;
-                    //qDebug() << val[2] << " ----- " << albedo.at<unsigned char>(j,i);
-                }
+                    if(ui->robustMenu->currentIndex()==3){
+                        reva = 0;
+                        for(int p=0; p<16;p++)
+                            reva = reva + sol_l.at<float>(p)*hweights[p];
+
+                        Vec3b col=image.at<Vec3b>(j,i);
+                        float nc = col[0]+col[1]+col[2];
+                        for(int k=0;k<3;k++){
+                            val[k] = 3*col[k]*reva/(nc);
+                        }
+                        test.at<Vec3b>(j,i)= val;
+                    }
+                    else { // save coeffs and images
+
+                        outcoef.write((char*)&sol_l.at<float>(0),sizeof(float));
+                        outcoef1.write((char*)&sol_l.at<float>(1),sizeof(float));
+                        outcoef2.write((char*)&sol_l.at<float>(2),sizeof(float));
+                        outcoef3.write((char*)&sol_l.at<float>(3),sizeof(float));
+                        outcoef4.write((char*)&sol_l.at<float>(4),sizeof(float));
+                        outcoef5.write((char*)&sol_l.at<float>(5),sizeof(float));
+                        outcoef6.write((char*)&sol_l.at<float>(6),sizeof(float));
+                        outcoef7.write((char*)&sol_l.at<float>(7),sizeof(float));
+                        outcoef8.write((char*)&sol_l.at<float>(8),sizeof(float));
+                        outcoef9.write((char*)&sol_l.at<float>(9),sizeof(float));
+                        outcoef10.write((char*)&sol_l.at<float>(10),sizeof(float));
+                        outcoef11.write((char*)&sol_l.at<float>(11),sizeof(float));
+                        outcoef12.write((char*)&sol_l.at<float>(12),sizeof(float));
+                        outcoef13.write((char*)&sol_l.at<float>(13),sizeof(float));
+                        outcoef14.write((char*)&sol_l.at<float>(14),sizeof(float));
+                        outcoef15.write((char*)&sol_l.at<float>(15),sizeof(float));
+
+                    }
 
 
+                } ////
 
             }
+    }
     else{
+
         // 8 bit RGB
         if(type==3){
 
             for(int cc=0; cc<3;cc++) { // loop over colors
-
-
-
-                for(int j=0;j<size[1];j++)
+         //       qDebug() << "test";
+                for(int j=0;j<size[1];j++){
+                    pdialog.setValue(100*j*cc/(3*size[1]));
+                    pdialog.update();
                     for(int i=0;i<size[0];i++)
                     {
+
                         if(dirtype==2) // interpolated dirs: estimate pixel-specific direction
                             for(int k=0;k<nimg;k++)
                             {
@@ -1324,6 +1731,11 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
 
                             if(ui->fitterMenu->currentIndex()==1){//PS
                                 L_uv=Mat::zeros(nimg,3,DataType<float>::type);
+                                b_l=Mat::zeros(nimg,1,CV_32FC1);
+                            }
+
+                            if(ui->fitterMenu->currentIndex()==3){//hsh 16
+                                L_uv=Mat::zeros(nimg,16,DataType<float>::type);
                                 b_l=Mat::zeros(nimg,1,CV_32FC1);
                             }
 
@@ -1372,11 +1784,35 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                                         b_l.at<float>(k)= (float)valc[k];
                                 }
                             }
+                            if(ui->fitterMenu->currentIndex()==3) {// HSH
+                                for (int k=0; k<nimg;k++){
+                                    float theta=acos(sqrt(1-pow( dirs[k][0] ,2) - pow( dirs[k][1] ,2) )); //angle theta
+                                    float phi=atan2(dirs[k][0],dirs[k][1]);
+                                    float hweights[16];
+                                    float chweights[16];
 
-                        } else if( ui->robustMenu->currentIndex()==1 ){  // trimmed fit
+                                    getHSH(theta, phi, hweights, 3);
+
+                                    getHSH(0, 0, chweights, 3);
+
+                                    for(int t=0;t<16;t++){
+                                        L_uv.at<float>(k,t)=hweights[t];
+                                        //qDebug() << chweights[t];
+                                    }
+                                    if(type==2)
+                                        b_l.at<float>(k)= vals[k]/256.0;
+                                    else if(type==1)
+                                        b_l.at<float>(k)= (float)valc[k];
+                                }
+                            }
+
+                        }
+                        else if( ui->robustMenu->currentIndex()==1 ){  // trimmed fit
+
+                            for (size_t p = 0; p != idx.size(); ++p) idx[p] = p;
+                            sort (idx.begin (), idx.end (), compare_index<vector<unsigned char> &>(vec));
+
                             ninl=nimg-8;
-                            //   for (int k=0; k<nimg;k++)
-                            //     if(shd[k]==0) ninl=ninl+1;
 
                             if( ui->fitterMenu->currentIndex()==0 || ui->fitterMenu->currentIndex()==2) {
                                 L_uv=Mat::zeros(ninl,6,DataType<float>::type);
@@ -1388,70 +1824,182 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                                 b_l=Mat::zeros(ninl,1,CV_32FC1);
                             }
 
-                            if(ui->fitterMenu->currentIndex()==0) {// standard PTM
-                                int k=0;
-                                for (int p=0; p<nimg;p++)
-                                    if(idx[p] >3 && idx[p] < nimg-4 )
-                                    {
-                                        L_uv.at<float>(k,0)=pow( dirs[k][0] ,2);
-                                        L_uv.at<float>(k,1)=pow( dirs[k][1],2);
-                                        L_uv.at<float>(k,2)=(dirs[k][0] * dirs[k][1]);
-                                        L_uv.at<float>(k,3)=dirs[k][0];
-                                        L_uv.at<float>(k,4)=dirs[k][1];
-                                        L_uv.at<float>(k,5)=1;
-                                        if(type==4)
-                                            b_l.at<float>(k)= vals[k]/256.0;
-                                        else if(type==3)
-                                            b_l.at<float>(k)= (float)valc[k];
-                                        k=k+1;
+                            if(ui->fitterMenu->currentIndex()==3){//hsh 16
+                                L_uv=Mat::zeros(ninl,16,DataType<float>::type);
+                                b_l=Mat::zeros(ninl,1,CV_32FC1);
+                            }
 
-                                    }
+                            if(ui->fitterMenu->currentIndex()==0) {// standard PTM
+
+                                for (int k=0; k<nimg-8;k++)
+                                {
+                                    L_uv.at<float>(k,0)=pow( dirs[idx[k+4]][0] ,2);
+                                    L_uv.at<float>(k,1)=pow( dirs[idx[k+4]][1],2);
+                                    L_uv.at<float>(k,2)=(dirs[idx[k+4]][0] * dirs[idx[k+4]][1]);
+                                    L_uv.at<float>(k,3)=dirs[idx[k+4]][0];
+                                    L_uv.at<float>(k,4)=dirs[idx[k+4]][1];
+                                    L_uv.at<float>(k,5)=1;
+                                    if(type==4)
+                                        b_l.at<float>(k)= vals[idx[k+4]]/256.0;
+                                    else if(type==3)
+                                        b_l.at<float>(k)= (float)valc[idx[k+4]];
+                                    k=k+1;
+
+                                }
                             }
                             if(ui->fitterMenu->currentIndex()==2) {// Drews PTM
 
+                                for (int k=0; k<nimg-8; k++){
+                                    L_uv.at<float>(k,0)=dirs[idx[k+4]][0];
+                                    L_uv.at<float>(k,1)=dirs[idx[k+4]][1];
+                                    L_uv.at<float>(k,2)=dirs[idx[k+4]][2];
+                                    L_uv.at<float>(k,3)=pow( dirs[idx[k+4]][0] ,2);
+                                    L_uv.at<float>(k,4)=(dirs[idx[k+4]][0] * dirs[idx[k+4]][1]);
+                                    L_uv.at<float>(k,5)=1;
+
+                                    if(type==4)
+                                        b_l.at<float>(k)= vals[idx[k+4]]/256.0;
+                                    else if(type==3)
+                                        b_l.at<float>(k)= (float)valc[idx[k+4]];
+                                    k=k+1;
+                                }
+                            }
+                            if(ui->fitterMenu->currentIndex()==1) {// PS
+
+                                for (int k=0; k<nimg-8;k++){
+                                    L_uv.at<float>(k,0)=dirs[idx[k+4]][0];
+                                    L_uv.at<float>(k,1)=dirs[idx[k+4]][1];
+                                    L_uv.at<float>(k,2)=dirs[idx[k+4]][2];
+
+                                    if(type==4)
+                                        b_l.at<float>(k)= vals[idx[k+4]]/256.0;
+                                    else if(type==3)
+                                        b_l.at<float>(k)= (float)valc[idx[k+4]];
+                                    k=k+1;
+                                }
+                            }
+
+                            if(ui->fitterMenu->currentIndex()==3) {// HSH
+                                for (int k=0; k<nimg-8;k++){
+                                    float theta=acos(sqrt(1-pow( dirs[idx[k]][0] ,2) - pow( dirs[idx[k]][1] ,2) )); //angle theta
+                                    float phi=atan2(dirs[idx[k]][0],dirs[idx[k]][1]);
+                                    float hweights[16];
+                                    float chweights[16];
+
+                                    getHSH(theta, phi, hweights, 3);
+
+                                    getHSH(0, 0, chweights, 3);
+
+                                    for(int t=0;t<16;t++){
+                                        L_uv.at<float>(k,t)=hweights[t];
+                                        //qDebug() << chweights[t];
+                                    }
+                                    if(type==2)
+                                        b_l.at<float>(k)= vals[idx[k]]/256.0;
+                                    else if(type==1)
+                                        b_l.at<float>(k)= (float)valc[idx[k]];
+                                }
+                            }
+
+                        }
+                        else if( ui->robustMenu->currentIndex()== 3) { // TEST
+                      
+                            if( ui->fitterMenu->currentIndex()==0 || ui->fitterMenu->currentIndex()==2) {
+                                L_uv=Mat::zeros(nimg-1,6,DataType<float>::type);
+                                b_l=Mat::zeros(nimg-1,1,CV_32FC1);
+                            }
+
+                            if(ui->fitterMenu->currentIndex()==1){//PS
+                                L_uv=Mat::zeros(nimg-1,3,DataType<float>::type);
+                                b_l=Mat::zeros(nimg-1,1,CV_32FC1);
+                            }
+
+                            if(ui->fitterMenu->currentIndex()==3){//hsh 16
+                                L_uv=Mat::zeros(nimg-1,16,DataType<float>::type);
+                                b_l=Mat::zeros(nimg-1,1,CV_32FC1);
+                            }
+
+                            if(ui->fitterMenu->currentIndex()==0) {// standard PTM
+
+                                int p=0;
+                                for (int k=0; k<nimg;k++)
+                                    if(k != ui->spinBox->value()){
+                                        L_uv.at<float>(p,0)=pow( dirs[k][0] ,2);
+                                        L_uv.at<float>(p,1)=pow( dirs[k][1],2);
+                                        L_uv.at<float>(p,2)=(dirs[k][0] * dirs[k][1]);
+                                        L_uv.at<float>(p,3)=dirs[k][0];
+                                        L_uv.at<float>(p,4)=dirs[k][1];
+                                        L_uv.at<float>(p,5)=1;
+                                        if(type==4)
+                                            b_l.at<float>(p)= vals[k]/256.0;
+                                        else if(type==3)
+                                            b_l.at<float>(p)= (float)valc[k];
+
+                                        p++;
+
+                                    }
+                             
+                            }
+                            if(ui->fitterMenu->currentIndex()==2) {// Drews PTM
                                 int k=0;
                                 for (int p=0; p<nimg;p++)
-                                    if(idx[p] >3 && idx[p] < nimg-4 ){
-                                        L_uv.at<float>(k,0)=dirs[k][0];
-                                        L_uv.at<float>(k,1)=dirs[k][1];
-                                        L_uv.at<float>(k,2)=dirs[k][2];
-                                        L_uv.at<float>(k,3)=pow( dirs[k][0] ,2);
-                                        L_uv.at<float>(k,4)=(dirs[k][0] * dirs[k][1]);
+                                    if(p != ui->spinBox->value()){
+                                        L_uv.at<float>(k,0)=dirs[p][0];
+                                        L_uv.at<float>(k,1)=dirs[p][1];
+                                        L_uv.at<float>(k,2)=dirs[p][2];
+                                        L_uv.at<float>(k,3)=pow( dirs[p][0] ,2);
+                                        L_uv.at<float>(k,4)=(dirs[p][0] * dirs[p][1]);
                                         L_uv.at<float>(k,5)=1;
 
-                                        if(type==4)
-                                            b_l.at<float>(k)= vals[k]/256.0;
-                                        else if(type==3)
-                                            b_l.at<float>(k)= (float)valc[k];
-                                        k=k+1;
+                                        b_l.at<float>(k)= (float)valc[p];
+                                        k++;
                                     }
                             }
                             if(ui->fitterMenu->currentIndex()==1) {// PS
 
                                 int k=0;
                                 for (int p=0; p<nimg;p++)
-                                    if(idx[p] >3 && idx[p] < nimg-4 ){
-                                        L_uv.at<float>(k,0)=dirs[k][0];
-                                        L_uv.at<float>(k,1)=dirs[k][1];
-                                        L_uv.at<float>(k,2)=dirs[k][2];
+                                    if(p != ui->spinBox->value()){
+                                        L_uv.at<float>(k,0)=dirs[p][0];
+                                        L_uv.at<float>(k,1)=dirs[p][1];
+                                        L_uv.at<float>(k,2)=dirs[p][2];
 
-                                        if(type==4)
-                                            b_l.at<float>(k)= vals[k]/256.0;
-                                        else if(type==3)
-                                            b_l.at<float>(k)= (float)valc[k];
-                                        k=k+1;
+                                        b_l.at<float>(k)= (float)valc[p];
+                                        k++;
+                                    }
+                            }
+                            if(ui->fitterMenu->currentIndex()==3) {// HSH
+                                //
+                                int k=0;
+                                for (int kk=0; kk<nimg; kk++)
+                                    if(kk!=ui->spinBox->value()){
+                                        float theta=acos(sqrt(1-pow( dirs[kk][0],2) - pow( dirs[kk][1],2) )); //angle theta
+                                        float phi=atan2(dirs[kk][0],dirs[kk][1]);
+                                        float hweights[16];
+                                        float chweights[16];
+
+                                        getHSH(theta, phi, hweights, 3);
+
+                                        for(int t=0;t<16;t++){
+                                            L_uv.at<float>(k,t)=hweights[t];
+                                            //qDebug() << chweights[t];
+                                        }
+                                        if(type==2)
+                                            b_l.at<float>(k)= vals[kk]/256.0;
+                                        else if(type==1)
+                                            b_l.at<float>(k)= (float)valc[kk];
+                                        k++;
                                     }
                             }
 
 
                         }
 
-
                         solve(L_uv, b_l, sol_l, DECOMP_SVD);
                         L_uv.release();
                         b_l.release();
 
-                        if(ui->fitterMenu->currentIndex()==0 || ui->fitterMenu->currentIndex()==2) {// PTM
+                        if(ui->fitterMenu->currentIndex()==0 || ui->fitterMenu->currentIndex()==2) {// PTM or DrewPTM
                             for (int k=0;k<6;k++){
                                 if (cvIsNaN(sol_l.at<float>(k))==1){
                                     sol_l.at<float>(k)=0;
@@ -1466,72 +2014,91 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                             outcoef4.write((char*)&sol_l.at<float>(4),sizeof(float));
                             outcoef5.write((char*)&sol_l.at<float>(5),sizeof(float));
 
-
-                            if(cc==0)
-                            albedo.at<unsigned char>(j,i) = (unsigned char)sol_l.at<float>(5);
-                            if(cc==1)
-                             albedog.at<unsigned char>(j,i) = (unsigned char)sol_l.at<float>(5);
-                            if(cc==2)
-                            albedob.at<unsigned char>(j,i) = (unsigned char)sol_l.at<float>(5);
-
-                            float speck=0, shy=0, she=0, stand=0;
-                            float diffe,thr;
-                            for (int k=0; k<nimg;k++){
-                                if(type==2)
-                                    diffe= vals[k]/256.0;
-                                else
-                                    diffe = valc[k];
-
-                                she = she+4*sh[k];
-
-                                thr= 12;
-
-                                if(ui->fitterMenu->currentIndex()==0)
-                                    diffe = diffe-(sol_l.at<float>(0)*pow( dirs[k][0] ,2)
-                                            +sol_l.at<float>(1)*pow( dirs[k][1],2)
-                                            +sol_l.at<float>(2)*(dirs[k][0] * dirs[k][1])
-                                            +sol_l.at<float>(3)*dirs[k][0]
-                                            +sol_l.at<float>(4)*dirs[k][1]
-                                            +sol_l.at<float>(5));
-                                else
-                                    diffe = diffe-(sol_l.at<float>(0)*dirs[k][0]
-                                            +sol_l.at<float>(1)*dirs[k][1]
-                                            +sol_l.at<float>(2)*dirs[k][2]
-                                            +sol_l.at<float>(3)*pow( dirs[k][0] ,2)
-                                            +sol_l.at<float>(4)*(dirs[k][0] * dirs[k][1])
-                                            +sol_l.at<float>(5));
-
-                                stand=stand+diffe*diffe;
-
-                                if(diffe>thr)
-                                    speck=speck+4;
-                                if(diffe<-thr)
-                                    shy=shy+4;
-                            }
-
-                            for(int k=0;k<3;k++)
-                                val[k]=speck;
-
-                            him.at<Vec3b>(j,i)= val;
-
-                            for(int k=0;k<3;k++)
-                                val[k]=shy;
-
-                            shim.at<Vec3b>(j,i)= val;
-
-
-                            for(int k=0;k<3;k++)
-                                val[k]=25*sqrt(stand)/nimg;
-
-                            test.at<Vec3b>(j,i)= val;
-
-                            for(int k=0;k<3;k++)
-                                val[k]=speck+shy;
-
-                            outlim.at<Vec3b>(j,i)= val;
-
                         }
-                        else if(ui->fitterMenu->currentIndex()==1){
+
+                        if(ui->fitterMenu->currentIndex()==0) {// PTM
+
+                            double reva;
+                            int kk= ui->spinBox->value();
+                            if(ui->robustMenu->currentIndex()==3){ //test
+                                reva = sol_l.at<float>(0)*pow( dirs[kk][0] ,2)+
+                                        sol_l.at<float>(1)*pow( dirs[kk][1],2)+
+                                        sol_l.at<float>(2)*(dirs[kk][0] * dirs[kk][1])+
+                                        sol_l.at<float>(3)*dirs[kk][0]+
+                                        sol_l.at<float>(4)*dirs[kk][1]+
+                                        sol_l.at<float>(5);
+
+                                test.at<Vec3b>(j,i)[cc]= std::max(0.0,std::min(255.0,reva));
+                                sol_l.release();
+                            }
+                            else {  // regular PTM estimate and save features
+
+                                if(cc==0)
+                                    albedo.at<unsigned char>(j,i) = (unsigned char)sol_l.at<float>(5);
+                                if(cc==1)
+                                    albedog.at<unsigned char>(j,i) = (unsigned char)sol_l.at<float>(5);
+                                if(cc==2)
+                                    albedob.at<unsigned char>(j,i) = (unsigned char)sol_l.at<float>(5);
+
+                                float speck=0, shy=0, she=0, stand=0;
+                                float diffe,thr;
+                                for (int k=0; k<nimg;k++){
+                                    if(type==2)
+                                        diffe= vals[k]/256.0;
+                                    else
+                                        diffe = valc[k];
+
+                                    she = she+4*sh[k];
+
+                                    thr= 12;
+
+                                    if(ui->fitterMenu->currentIndex()==0)
+                                        diffe = diffe-(sol_l.at<float>(0)*pow( dirs[k][0] ,2)
+                                                +sol_l.at<float>(1)*pow( dirs[k][1],2)
+                                                +sol_l.at<float>(2)*(dirs[k][0] * dirs[k][1])
+                                                +sol_l.at<float>(3)*dirs[k][0]
+                                                +sol_l.at<float>(4)*dirs[k][1]
+                                                +sol_l.at<float>(5));
+                                    else
+                                        diffe = diffe-(sol_l.at<float>(0)*dirs[k][0]
+                                                +sol_l.at<float>(1)*dirs[k][1]
+                                                +sol_l.at<float>(2)*dirs[k][2]
+                                                +sol_l.at<float>(3)*pow( dirs[k][0] ,2)
+                                                +sol_l.at<float>(4)*(dirs[k][0] * dirs[k][1])
+                                                +sol_l.at<float>(5));
+
+                                    stand=stand+diffe*diffe;
+
+                                    if(diffe>thr)
+                                        speck=speck+4;
+                                    if(diffe<-thr)
+                                        shy=shy+4;
+                                }
+
+                                for(int k=0;k<3;k++)
+                                    val[k]=speck;
+
+                                him.at<Vec3b>(j,i)= val;
+
+                                for(int k=0;k<3;k++)
+                                    val[k]=shy;
+
+                                shim.at<Vec3b>(j,i)= val;
+
+
+                                for(int k=0;k<3;k++)
+                                    val[k]=25*sqrt(stand)/nimg;
+
+                                test.at<Vec3b>(j,i)= val;
+
+                                for(int k=0;k<3;k++)
+                                    val[k]=speck+shy;
+
+                                outlim.at<Vec3b>(j,i)= val;
+                            }
+                        }
+
+                        else if(ui->fitterMenu->currentIndex()==1){ //PS
 
 
                             float nf = sqrt(sol_l.at<float>(0)*sol_l.at<float>(0)+sol_l.at<float>(1)*sol_l.at<float>(1)+sol_l.at<float>(2)*sol_l.at<float>(2));
@@ -1549,11 +2116,11 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
 
                             normals.at<Vec3b>(j,i) = val;
                             if(cc==0)
-                            albedo.at<unsigned char>(j,i) = 0.6*nf;
+                                albedo.at<unsigned char>(j,i) = 0.6*nf;
                             if(cc==1)
-                             albedog.at<unsigned char>(j,i) = 0.6*nf;
+                                albedog.at<unsigned char>(j,i) = 0.6*nf;
                             if(cc==2)
-                            albedob.at<unsigned char>(j,i) = 0.6*nf;
+                                albedob.at<unsigned char>(j,i) = 0.6*nf;
 
 
                             // estimating features
@@ -1605,7 +2172,7 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
 
                         }
 
-                        if(ui->fitterMenu->currentIndex()==2){
+                        if(ui->fitterMenu->currentIndex()==2){ // DREW PTM features
                             float nf = sqrt(sol_l.at<float>(0)*sol_l.at<float>(0)+sol_l.at<float>(1)*sol_l.at<float>(1)+sol_l.at<float>(2)*sol_l.at<float>(2));
 
                             for(int k=0;k<3;k++)
@@ -1613,19 +2180,60 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
 
                             normals.at<Vec3b>(j,i) = val;
                             if(cc==0)
-                            albedo.at<unsigned char>(j,i) = 0.6*nf;
+                                albedo.at<unsigned char>(j,i) = 0.6*nf;
                             if(cc==1)
-                             albedog.at<unsigned char>(j,i) = 0.6*nf;
+                                albedog.at<unsigned char>(j,i) = 0.6*nf;
                             if(cc==2)
-                            albedob.at<unsigned char>(j,i) = 0.6*nf;
+                                albedob.at<unsigned char>(j,i) = 0.6*nf;
                             //qDebug() << val[2] << " ----- " << albedo.at<unsigned char>(j,i);
                         }
 
+                        else if(ui->fitterMenu->currentIndex()==3){ //HSH
 
+                            //relight
+                            float reva;
+                            int kk= ui->spinBox->value();
+
+                            float theta=acos(sqrt(1-pow( dirs[kk][0] ,2) - pow( dirs[kk][1] ,2) )); //angle theta
+                            float phi=atan2(dirs[kk][0],dirs[kk][1]);
+                            float hweights[16];
+                            getHSH(theta, phi, hweights, 3);
+
+                            if(ui->robustMenu->currentIndex()==3){
+                                reva = 0;
+                                for(int p=0; p<16;p++)
+                                    reva = reva + sol_l.at<float>(p)*hweights[p];
+
+                                test.at<Vec3b>(j,i)[cc] = reva;
+                            }
+                            else { // save coeffs and images
+
+                                outcoef.write((char*)&sol_l.at<float>(0),sizeof(float));
+                                outcoef1.write((char*)&sol_l.at<float>(1),sizeof(float));
+                                outcoef2.write((char*)&sol_l.at<float>(2),sizeof(float));
+                                outcoef3.write((char*)&sol_l.at<float>(3),sizeof(float));
+                                outcoef4.write((char*)&sol_l.at<float>(4),sizeof(float));
+                                outcoef5.write((char*)&sol_l.at<float>(5),sizeof(float));
+                                outcoef6.write((char*)&sol_l.at<float>(6),sizeof(float));
+                                outcoef7.write((char*)&sol_l.at<float>(7),sizeof(float));
+                                outcoef8.write((char*)&sol_l.at<float>(8),sizeof(float));
+                                outcoef9.write((char*)&sol_l.at<float>(9),sizeof(float));
+                                outcoef10.write((char*)&sol_l.at<float>(10),sizeof(float));
+                                outcoef11.write((char*)&sol_l.at<float>(11),sizeof(float));
+                                outcoef12.write((char*)&sol_l.at<float>(12),sizeof(float));
+                                outcoef13.write((char*)&sol_l.at<float>(13),sizeof(float));
+                                outcoef14.write((char*)&sol_l.at<float>(14),sizeof(float));
+                                outcoef15.write((char*)&sol_l.at<float>(15),sizeof(float));
+
+                            }
+
+
+                        } ////
 
 
                     }
-            normals2=normals2+normals/3.0;
+                }
+                    normals2=normals2+normals/3.0;
             }
             normals=normals2;
             albedos.at(2) = albedo;
@@ -1633,8 +2241,10 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
             albedos.at(0) = albedob;
 
 
-    }
-    if(type==4){ // 16 bit RGB
+        }
+
+        if(type==4){
+            // 16 bit RGB
 
             for(int cc=0; cc<3;cc++) { // loop over colors
                 for(int j=0;j<size[1];j++)
@@ -1675,7 +2285,7 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                                     L_uv.at<float>(k,4)=dirs[k][1];
                                     L_uv.at<float>(k,5)=1;
 
-                                        b_l.at<float>(k)= vals[k]/256.0;
+                                    b_l.at<float>(k)= vals[k]/256.0;
 
 
                                 }
@@ -1690,7 +2300,7 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                                     L_uv.at<float>(k,4)=(dirs[k][0] * dirs[k][1]);
                                     L_uv.at<float>(k,5)=1;
 
-                                        b_l.at<float>(k)= vals[k]/256.0;
+                                    b_l.at<float>(k)= vals[k]/256.0;
 
                                 }
                             }
@@ -1739,7 +2349,7 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                                         L_uv.at<float>(k,4)=dirs[k][1];
                                         L_uv.at<float>(k,5)=1;
 
-                                            b_l.at<float>(k)= vals[k]/256.0;
+                                        b_l.at<float>(k)= vals[k]/256.0;
 
                                         k=k+1;
 
@@ -1757,7 +2367,7 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                                         L_uv.at<float>(k,4)=(dirs[k][0] * dirs[k][1]);
                                         L_uv.at<float>(k,5)=1;
 
-                                            b_l.at<float>(k)= vals[k]/256.0;
+                                        b_l.at<float>(k)= vals[k]/256.0;
 
                                         k=k+1;
                                     }
@@ -1772,7 +2382,7 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                                         L_uv.at<float>(k,2)=dirs[k][2];
 
 
-                                            b_l.at<float>(k)= vals[k]/256.0;
+                                        b_l.at<float>(k)= vals[k]/256.0;
 
                                         k=k+1;
                                     }
@@ -1802,17 +2412,17 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
 
 
                             if(cc==0)
-                            albedo.at<unsigned char>(j,i) = (unsigned char)sol_l.at<float>(5);
+                                albedo.at<unsigned char>(j,i) = (unsigned char)sol_l.at<float>(5);
                             if(cc==1)
-                             albedog.at<unsigned char>(j,i) = (unsigned char)sol_l.at<float>(5);
+                                albedog.at<unsigned char>(j,i) = (unsigned char)sol_l.at<float>(5);
                             if(cc==2)
-                            albedob.at<unsigned char>(j,i) = (unsigned char)sol_l.at<float>(5);
+                                albedob.at<unsigned char>(j,i) = (unsigned char)sol_l.at<float>(5);
 
                             float speck=0, shy=0, she=0, stand=0;
                             float diffe,thr;
                             for (int k=0; k<nimg;k++){
 
-                                    diffe= vals[k]/256.0;
+                                diffe= vals[k]/256.0;
 
                                 she = she+4*sh[k];
 
@@ -1876,11 +2486,11 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
 
                             normals.at<Vec3b>(j,i) = val;
                             if(cc==0)
-                            albedo.at<unsigned char>(j,i) = 0.6*nf;
+                                albedo.at<unsigned char>(j,i) = 0.6*nf;
                             if(cc==1)
-                             albedog.at<unsigned char>(j,i) = 0.6*nf;
+                                albedog.at<unsigned char>(j,i) = 0.6*nf;
                             if(cc==2)
-                            albedob.at<unsigned char>(j,i) = 0.6*nf;
+                                albedob.at<unsigned char>(j,i) = 0.6*nf;
 
 
                             // estimating features
@@ -1889,7 +2499,7 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
 
                             for (int k=0; k<nimg;k++){
 
-                                    diffe= vals[k]/256.0;
+                                diffe= vals[k]/256.0;
 
                                 she = she+4*sh[k];
 
@@ -1936,11 +2546,11 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
 
                             normals.at<Vec3b>(j,i) = val;
                             if(cc==0)
-                            albedo.at<unsigned char>(j,i) = 0.6*nf;
+                                albedo.at<unsigned char>(j,i) = 0.6*nf;
                             if(cc==1)
-                             albedog.at<unsigned char>(j,i) = 0.6*nf;
+                                albedog.at<unsigned char>(j,i) = 0.6*nf;
                             if(cc==2)
-                            albedob.at<unsigned char>(j,i) = 0.6*nf;
+                                albedob.at<unsigned char>(j,i) = 0.6*nf;
                             //qDebug() << val[2] << " ----- " << albedo.at<unsigned char>(j,i);
                         }
 
@@ -1948,96 +2558,159 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                     }
 
                 normals2=normals2+normals/3.0;
-                }
-                normals=normals2;
+            }
+            normals=normals2;
             albedos.at(2) = albedo;
             albedos.at(1) = albedog;
             albedos.at(0) = albedob;
+        }
     }
-    } // end loop over colors
 
-// Tinsae HERE - if more files opened, close
+    //
     outcoef.close();
     outcoef1.close();
     outcoef2.close();
     outcoef3.close();
 
     if(ui->fitterMenu->currentIndex()==2 || ui->fitterMenu->currentIndex()==1){
-    outcoef4.close();
-    outcoef5.close();
+        outcoef4.close();
+        outcoef5.close();
     }
 
-    filename.replace(".apd",".ptm");
+    if(ui->fitterMenu->currentIndex()==4){
+        outcoef6.close();
+        outcoef7.close();
+        outcoef8.close();
+        outcoef9.close();
+        outcoef10.close();
+        outcoef11.close();
+        outcoef12.close();
+        outcoef13.close();
+        outcoef14.close();
+        outcoef15.close();
+    }
+
+    if(ui->fitterMenu->currentIndex()==3)
+        filename.replace(".apd",".rti");
+    else
+        filename.replace(".apd",".ptm");
 
     int lastc= filename.lastIndexOf(QDir::separator());
     QString lastname=filename.right(filename.size()-lastc-1);
 
 
-//Tinsae HERE - if hsh save related .hsh file
+    //Tinsae HERE - if hsh save related .hsh file
 
     if(type < 3){
-    if(ui->fitterMenu->currentIndex()==0) {// convert saved coeffs to viewable ptm
-        savePTM_LRGB(lastname,size[0],size[1],chroma_img);
 
-        ui->msgBox->setText("saved LRGB .ptm file" + lastname);
+        if(ui->fitterMenu->currentIndex()==3) {// convert saved coeffs to viewable rti
+            if(ui->robustMenu->currentIndex()==3){ // TEST
 
-    }
-    if(ui->fitterMenu->currentIndex()==1  || ui->fitterMenu->currentIndex()==2){
+                imwrite("relighted.png",test);
+                cv::cvtColor(test,test, cv::COLOR_BGR2RGB);
+                iw->setImage(test);
+                iw->show();
 
-        imwrite("normals.png",normals);
-        imwrite("albedo.png",albedo);
-        ui->msgBox->setText("saved normals and albedo images");
-
-        cv::cvtColor(normals,normals, cv::COLOR_BGR2RGB);
-        cv::cvtColor(albedo, albedo, cv::COLOR_GRAY2BGR);
-        if(ui->fitViewBox->currentIndex()==2){
-            iw->setImage(albedo);
-            iw->show();
-        }
-        if(ui->fitViewBox->currentIndex()==1){
-            iw->setImage(normals);
-            iw->show();
-        }
-        if(ui->fitViewBox->currentIndex()==4){
-            iw->setImage(test);
-            iw->show();
-        }
-        if(ui->fitViewBox->currentIndex()==3){
-            iw->setImage(outlim);
-            iw->show();
+                ui->msgBox->setText("saved relighted image");
+            }
+            else{
+            saveRTI_LRGB(lastname,size[0],size[1],1,chroma_img);
+            ui->msgBox->setText("saved LRGB .rti file" + lastname);
+            }
         }
 
-    }
 
-    if(ui->fitterMenu->currentIndex()==0){
+        if(ui->fitterMenu->currentIndex()==0)
+            if(ui->robustMenu->currentIndex()==3){
 
-        if(ui->fitViewBox->currentIndex()==1){
-            ui->msgBox->setText("Normals not estimated in PTM mode");
+                imwrite("relighted.png",test);
+                cv::cvtColor(test,test, cv::COLOR_BGR2RGB);
+                iw->setImage(test);
+                iw->show();
+
+                ui->msgBox->setText("saved relighted image");
+            }
+            else {// convert saved coeffs to viewable ptm
+                savePTM_LRGB(lastname,size[0],size[1],chroma_img);
+
+                ui->msgBox->setText("saved LRGB .ptm file" + lastname);
+
+            }
+
+        if(ui->fitterMenu->currentIndex()==1  || ui->fitterMenu->currentIndex()==2)
+            if(ui->robustMenu->currentIndex()==3){
+
+                imwrite("relighted.png",test);
+                cv::cvtColor(test,test, cv::COLOR_BGR2RGB);
+                iw->setImage(test);
+                iw->show();
+
+                ui->msgBox->setText("saved relighted image");
+            }
+            else {
+
+                imwrite("normals.png",normals);
+                imwrite("albedo.png",albedo);
+                ui->msgBox->setText("saved normals and albedo images");
+
+                cv::cvtColor(normals,normals, cv::COLOR_BGR2RGB);
+                cv::cvtColor(albedo, albedo, cv::COLOR_GRAY2BGR);
+                if(ui->fitViewBox->currentIndex()==2){
+                    iw->setImage(albedo);
+                    iw->show();
+                }
+                if(ui->fitViewBox->currentIndex()==1){
+                    iw->setImage(normals);
+                    iw->show();
+                }
+                if(ui->fitViewBox->currentIndex()==4){
+                    iw->setImage(test);
+                    iw->show();
+                }
+                if(ui->fitViewBox->currentIndex()==3){
+                    iw->setImage(outlim);
+                    iw->show();
+                }
+
+            }
+
+        if(ui->fitterMenu->currentIndex()==0)
+            if(ui->robustMenu->currentIndex()==3){
+                iw->setImage(test);
+                iw->show();
+            }
+            else {
+
+                if(ui->fitViewBox->currentIndex()==1){
+                    ui->msgBox->setText("Normals not estimated in PTM mode");
+                }
+                if(ui->fitViewBox->currentIndex()==2){
+                    ui->msgBox->setText("Albedo not estimated in PTM mode");
+                }
+                if(ui->fitViewBox->currentIndex()==4){
+                    iw->setImage(test);
+                    iw->show();
+                }
+                if(ui->fitViewBox->currentIndex()==3){
+                    iw->setImage(outlim);
+                    iw->show();
+                }
+
+            }
+
+        if(ui->fitterMenu->currentIndex()<3 && ui->robustMenu->currentIndex()!= 3){
+            imwrite("him.png",him);
+            imwrite("shim.png",shim);
+            imwrite("outlim.png",outlim);
+            imwrite("residual.png",test);
         }
-        if(ui->fitViewBox->currentIndex()==2){
-            ui->msgBox->setText("Albedo not estimated in PTM mode");
-        }
-        if(ui->fitViewBox->currentIndex()==4){
-            iw->setImage(test);
-            iw->show();
-        }
-        if(ui->fitViewBox->currentIndex()==3){
-            iw->setImage(outlim);
-            iw->show();
-        }
-
-    }
-
-
-    imwrite("him.png",him);
-    imwrite("shim.png",shim);
-    imwrite("outlim.png",outlim);
-    
-    imwrite("residual.png",test);
 
     }
     else{ // COLOR - type>2
-        if(ui->fitterMenu->currentIndex()==0) {// convert saved coeffs to viewable ptm
+
+        if(ui->fitterMenu->currentIndex()==0){
+
+            // convert saved coeffs to viewable ptm
 
             savePTM_RGB(lastname,size[0],size[1]);
             cv::Mat colorImage;
@@ -2052,78 +2725,99 @@ if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm}
                 iw->show();
             }
 
-           // cv::merge(albedos, colorImage);
-           // imwrite("albedo.png",colorImage);
+            // cv::merge(albedos, colorImage);
+            // imwrite("albedo.png",colorImage);
 
-//            cv::cvtColor(colorImage, colorImage, cv::COLOR_BGR2RGB);
-//            if(ui->fitViewBox->currentIndex()==2){
-//                iw->setImage(colorImage);
-//                iw->show();
-//            }
+            //            cv::cvtColor(colorImage, colorImage, cv::COLOR_BGR2RGB);
+            //            if(ui->fitViewBox->currentIndex()==2){
+            //                iw->setImage(colorImage);
+            //                iw->show();
+            //            }
+        }
+        if(ui->fitterMenu->currentIndex()==1  || ui->fitterMenu->currentIndex()==2){
+            if(ui->robustMenu->currentIndex()==3){
+                iw->setImage(test);
+                iw->show();
+                imwrite("relighted.png",test);
+            }
+            else {
+
+                imwrite("normals.png",normals);
+
+                cv::Mat colorImage;
+                cv::merge(albedos, colorImage);
+                imwrite("albedo.png",colorImage);
+                //imwrite("albedo.png",albedo);
+                ui->msgBox->setText("saved normals and albedo images");
+
+
+                cv::cvtColor(normals,normals, cv::COLOR_BGR2RGB);
+                //cv::cvtColor(albedo, albedo, cv::COLOR_GRAY2BGR);
+                if(ui->fitViewBox->currentIndex()==2){
+                    iw->setImage(colorImage);
+                    iw->show();
+                }
+                if(ui->fitViewBox->currentIndex()==1){
+                    iw->setImage(normals);
+                    iw->show();
+                }
+                if(ui->fitViewBox->currentIndex()==4){
+                    iw->setImage(test);
+                    iw->show();
+                }
+                if(ui->fitViewBox->currentIndex()==3){
+                    iw->setImage(outlim);
+                    iw->show();
+                }
+
+                imwrite("him.png",him);
+                imwrite("shim.png",shim);
+                imwrite("outlim.png",outlim);
+                imwrite("residual.png",test);
+            }
+        }
+
+        if(ui->fitterMenu->currentIndex()==0)
+        {
+            if(ui->robustMenu->currentIndex()==3){
+                iw->setImage(test);
+                iw->show();
+                ui->msgBox->setText("saved relighted image");
+                cv::cvtColor(test,test, cv::COLOR_BGR2RGB);
+                imwrite("relighted.png",test);
+            }
+            else{
+
+                if(ui->fitViewBox->currentIndex()==1){
+                    ui->msgBox->setText("Normals not estimated in PTM mode");
+                }
+                if(ui->fitViewBox->currentIndex()==2){
+                    ui->msgBox->setText("Albedo not estimated in PTM mode");
+                }
+                if(ui->fitViewBox->currentIndex()==4){
+                    iw->setImage(test);
+                    iw->show();
+                }
+                if(ui->fitViewBox->currentIndex()==3){
+                    iw->setImage(outlim);
+                    iw->show();
+                }
+
+                imwrite("him.png",him);
+                imwrite("shim.png",shim);
+                imwrite("outlim.png",outlim);
+                imwrite("residual.png",test);
+            }
+        }
+
+
+
     }
-    if(ui->fitterMenu->currentIndex()==1  || ui->fitterMenu->currentIndex()==2){
-
-        imwrite("normals.png",normals);
-
-          cv::Mat colorImage;
-         cv::merge(albedos, colorImage);
-        imwrite("albedo.png",colorImage);
-        //imwrite("albedo.png",albedo);
-        ui->msgBox->setText("saved normals and albedo images");
-
-
-        cv::cvtColor(normals,normals, cv::COLOR_BGR2RGB);
-        //cv::cvtColor(albedo, albedo, cv::COLOR_GRAY2BGR);
-        if(ui->fitViewBox->currentIndex()==2){
-            iw->setImage(colorImage);
-            iw->show();
-        }
-        if(ui->fitViewBox->currentIndex()==1){
-            iw->setImage(normals);
-            iw->show();
-        }
-        if(ui->fitViewBox->currentIndex()==4){
-            iw->setImage(test);
-            iw->show();
-        }
-        if(ui->fitViewBox->currentIndex()==3){
-            iw->setImage(outlim);
-            iw->show();
-        }
-
-    }
-
-    if(ui->fitterMenu->currentIndex()==0){
-
-        if(ui->fitViewBox->currentIndex()==1){
-            ui->msgBox->setText("Normals not estimated in PTM mode");
-        }
-        if(ui->fitViewBox->currentIndex()==2){
-            ui->msgBox->setText("Albedo not estimated in PTM mode");
-        }
-        if(ui->fitViewBox->currentIndex()==4){
-            iw->setImage(test);
-            iw->show();
-        }
-        if(ui->fitViewBox->currentIndex()==3){
-            iw->setImage(outlim);
-            iw->show();
-        }
-
-    }
-
-
-    imwrite("him.png",him);
-    imwrite("shim.png",shim);
-    imwrite("outlim.png",outlim);
-
-    imwrite("residual.png",test);
-}
 
     filed.close();
 }
 
-void apTool::on_showButton_clicked()
+void apTool::on_showButton_clicked()   // Funzione per relighting
 {
     iw->white1->setGeometry(QRect(0,0,0,0));
     iw->point1->setGeometry(QRect(0,0,0,0));
@@ -2292,9 +2986,13 @@ void apTool::on_showButton_clicked()
 
     // Image for output
     Mat shownImg(size[1],size[0],CV_8UC3,cv::Scalar(0,0,0));
+
+    Mat comparedImg(size[1],size[0],CV_8UC3,cv::Scalar(0,0,0));
+
     ui->msgBox->setText("Estimating image");
 
     Vec3f val;
+    Vec3f valcomp;
     Vec3f dire;
     vector <float> dist;
     unsigned char* valc = new unsigned char[nimg];
@@ -2459,6 +3157,21 @@ void apTool::on_showButton_clicked()
 
     }
 
+    if(ui->viewBox->currentIndex()==4){
+
+        lx=dirs[ui->spinBox->value()][0];
+        ly=dirs[ui->spinBox->value()][1];
+        for(int k=0;k<nimg;k++){
+            float dv=(lx-dirs[k][0])*(lx-dirs[k][0])+(ly-dirs[k][1])*(ly-dirs[k][1])+(lz-dirs[k][2])*(lz-dirs[k][2]);
+            dist.push_back(dv);
+        }
+
+        iv.resize(nimg);
+        for (size_t p = 0; p != iv.size(); ++p) iv[p] = p;
+        sort (iv.begin (), iv.end (), compare_index<vector<float> &>(dist));
+        dist.clear();
+
+    }
 
 
     // Part to look at: loop over APA pixel blocks
@@ -2495,21 +3208,22 @@ void apTool::on_showButton_clicked()
 
                     float avg;
                     vector<size_t> idx(vec.size());
-                    /*        for (size_t p = 0; p != idx.size(); ++p) {idx[p] = p; avg=avg+vec[p];}
-                sort (idx.begin (), idx.end (), compare_index<vector<unsigned char> &>(vec));
-                avg /= vec.size();
-
-                mini = idx[0];
-                maxi = idx[nimg-1];
-                if((vec.size()/2) % 2 == 0)
-                    medi = idx[(vec.size())/2 + 1];
-                else
-                    medi = idx[(vec.size())/2];*/
-
 
                     /*  Vec3f cc; cc[0] = 0.2126; cc[1] = 0.7152; cc[2] = 0.0722;*/
 
-                    if(ui->viewBox->currentIndex()==0){
+                    if(ui->viewBox->currentIndex()==3){ // max
+                        for (size_t p = 0; p != idx.size(); ++p) {idx[p] = p; }
+                        sort (idx.begin (), idx.end (), compare_index<vector<unsigned char> &>(vec));
+                        mini = idx[0];
+                        maxi = idx[nimg-1];
+
+                        Vec3b col=image.at<Vec3b>(j,i);
+                        float nc = col[0]+col[1]+col[2];
+                        for(int k=0;k<3;k++){
+                            val[k] = 3*col[k]*vec[maxi]/(nc);
+                        }
+                    }
+                    if(ui->viewBox->currentIndex()==0){ // median
                         for (size_t p = 0; p != idx.size(); ++p) {idx[p] = p; }
                         sort (idx.begin (), idx.end (), compare_index<vector<unsigned char> &>(vec));
 
@@ -2520,7 +3234,6 @@ void apTool::on_showButton_clicked()
                         else
                             medi = idx[(vec.size())/2];
 
-
                         for(int k=0;k<3;k++){
                             Vec3b col=image.at<Vec3b>(j,i);
                             float nc = col[0]+col[1]+col[2];
@@ -2528,7 +3241,7 @@ void apTool::on_showButton_clicked()
                         }
 
                     }
-                    else if(ui->viewBox->currentIndex()==1){
+                    else if(ui->viewBox->currentIndex()==1){ //average
                         for (size_t p = 0; p != idx.size(); ++p) {avg=avg+vec[p];}
                         avg /= vec.size();
 
@@ -2541,14 +3254,7 @@ void apTool::on_showButton_clicked()
                     }
                     else if(ui->viewBox->currentIndex()==2){
                         // interpolate
-                        // QUI DA IMPLEMENTARE!
 
-                        //  qDebug() << i << " " << j  << "\n";
-                        /*
-                    float lx = ui->lxSpinBox->value();
-                    float ly = ui->lySpinBox->value();
-                    float lz = (1-lx*lx-ly*ly);
-*/
                         Vec3b col=image.at<Vec3b>(j,i);
                         float nc = col[0]+col[1]+col[2];
 
@@ -2556,6 +3262,7 @@ void apTool::on_showButton_clicked()
                         if (flagInterp == false) {
                             rbfcreate(2, 1, modelInterpolation);
                             arrayInterpolation.setlength(nen, 3);
+
                             /*
                     for(int k=0;k<vec.size();k++){
                         float dv=(lx-dirs[k][0])*(lx-dirs[k][0])+(ly-dirs[k][1])*(ly-dirs[k][1])+(lz-dirs[k][2])*(lz-dirs[k][2]);
@@ -2578,7 +3285,6 @@ void apTool::on_showButton_clicked()
                         for(int k=0; k<nen; k++)
                             arrayInterpolation(k, 2) = vec[iv[k]];
 
-
                         rbfsetpoints(modelInterpolation, arrayInterpolation);
                         float rr = ui->rbfSpinBox->value();
                         rbfsetalgomultilayer(modelInterpolation, rr, 1, 10e-3);
@@ -2589,7 +3295,6 @@ void apTool::on_showButton_clicked()
 
                         for (int k=0; k<3; k++)
                             val[k] = 3*col[k]*res/(nc);
-
 
 
                         /*
@@ -2613,8 +3318,55 @@ void apTool::on_showButton_clicked()
                             val[k] = val[k] + (3*col[k]*vec[iv[i]]/(nc*256))*((distf-distvector[i])/distf);
                     }*/
                     }
+                    else if(ui->viewBox->currentIndex()==4){
+                        // interpolate removing an image on the missing image directions
+
+                        Vec3b col=image.at<Vec3b>(j,i);
+                        float nc = col[0]+col[1]+col[2];
+
+                        int nen=7;
+                        if (flagInterp == false) {
+                            rbfcreate(2, 1, modelInterpolation);
+                            arrayInterpolation.setlength(nen, 3);
+
+                            qDebug() << dirs[0][0]  << dirs[0][1]  << dirs[0][2];
+                            qDebug() << dirs[1][0]  << dirs[1][1]  << dirs[1][2];
+
+
+
+                            // prendo i vicini escluso il primo
+                            for(int k1=0; k1<nen; k1++)
+                                for(int k2=0; k2<2; k2++) {
+                                    arrayInterpolation(k1, k2) = dirs[iv[k1+1]][k2];
+                                }
+
+                            flagInterp=true;
+                        }
+                        lx=dirs[iv[0]][0];
+                        ly=dirs[iv[0]][1];
+
+                        for(int k=0; k<nen; k++)
+                            arrayInterpolation(k, 2) = vec[iv[k+1]];
+
+                        rbfsetpoints(modelInterpolation, arrayInterpolation);
+                        float rr = ui->rbfSpinBox->value();
+                        rbfsetalgomultilayer(modelInterpolation, rr, 1, 10e-3);
+
+                        rbfbuildmodel(modelInterpolation, repInterpolation);
+
+                        double res = rbfcalc2(modelInterpolation, lx, ly);
+
+                        for (int k=0; k<3; k++)
+                            val[k] = 3*col[k]*res/(nc);
+                        for (int k=0; k<3; k++)
+                            valcomp[k] = 3*col[k]*vec[iv[0]]/nc;
+
+                        comparedImg.at<Vec3b>(j,i) = valcomp;
+                    }
+
 
                     shownImg.at<Vec3b>(j,i) = val;
+
 
                 }
                 // 16 bit LRGB
@@ -2678,15 +3430,8 @@ void apTool::on_showButton_clicked()
                         }
                     }
                     else if(ui->viewBox->currentIndex()==2){
-                        // interpolate
-                        // QUI DA IMPLEMENTARE!
+                        // interpolation
 
-                        /*                  qDebug() << i << " " << j  << "\n";
-
-                    float lx = ui->lxSpinBox->value();
-                    float ly = ui->lySpinBox->value();
-                    float lz = (1-lx*lx-ly*ly);
-*/
                         Vec3b col=image.at<Vec3b>(j,i);
                         float nc = col[0]+col[1]+col[2];
                         int nen=7;
@@ -2699,12 +3444,6 @@ void apTool::on_showButton_clicked()
                                 dist.push_back(dv);
                             }
 
-                            /*
-                    iv.resize(vec.size());
-                    for (size_t p = 0; p != iv.size(); ++p) iv[p] = p;
-                    sort (iv.begin (), iv.end (), compare_index<vector<float> &>(dist));
-                    dist.clear();
-                    */
 
                             for(int k1=0; k1<nen; k1++)
                                 for(int k2=0; k2<2; k2++) {
@@ -2727,7 +3466,7 @@ void apTool::on_showButton_clicked()
                         double res = rbfcalc2(modelInterpolation, lx, ly);
 
                         for (int k=0; k<3; k++)
-                            val[k] = 3*col[k]*res/(nc*256);
+                            val[k] = 3*col[k]*res/(nc*255);
 
                         /*//ORA BANALMENTE PRENDE LA DISTANZA, ORDINA e prende nearst neighbor
                     for(int k=0;k<vec.size();k++){
@@ -2927,6 +3666,46 @@ void apTool::on_showButton_clicked()
                         val[k] = val[k] + (3*col[k]*vec[iv[i]]/(nc*256))*((distf-distvector[i])/distf);
                 }*/
                         }
+                        else if(ui->viewBox->currentIndex()==4){
+                            // interpolate removing an image on the missing image directions
+
+                            int nen=7;
+                            if (flagInterp == false) {
+                                rbfcreate(2, 1, modelInterpolation);
+                                arrayInterpolation.setlength(nen, 3);
+
+                                qDebug() << dirs[0][0]  << dirs[0][1]  << dirs[0][2];
+                                qDebug() << dirs[1][0]  << dirs[1][1]  << dirs[1][2];
+
+                                // prendo i vicini escluso il primo
+                                for(int k1=0; k1<nen; k1++)
+                                    for(int k2=0; k2<2; k2++) {
+                                        arrayInterpolation(k1, k2) = dirs[iv[k1+1]][k2];
+                                    }
+
+                                flagInterp=true;
+                            }
+                            lx=dirs[iv[0]][0];
+                            ly=dirs[iv[0]][1];
+
+                            for(int k=0; k<nen; k++)
+                                arrayInterpolation(k, 2) = vec[iv[k+1]];
+
+                            rbfsetpoints(modelInterpolation, arrayInterpolation);
+                            float rr = ui->rbfSpinBox->value();
+                            rbfsetalgomultilayer(modelInterpolation, rr, 1, 10e-3);
+
+                            rbfbuildmodel(modelInterpolation, repInterpolation);
+
+                            double res = rbfcalc2(modelInterpolation, lx, ly);
+
+                            shownImg.at<Vec3b>(j,i)[cc] = res;
+
+
+                            comparedImg.at<Vec3b>(j,i)[cc] = vec[iv[0]];
+                        }
+
+
                     }
 
             } // end loop over colors
@@ -3080,7 +3859,9 @@ void apTool::on_showButton_clicked()
     filed.close();
     cv::cvtColor(shownImg,shownImg, cv::COLOR_BGR2RGB);
     imwrite("result.png",shownImg);
-
+    if(ui->viewBox->currentIndex()==4)
+    { cv::cvtColor(comparedImg,comparedImg, cv::COLOR_BGR2RGB);
+        imwrite("compared.png",comparedImg);}
 }
 
 void apTool::on_pushButton_6_clicked()
