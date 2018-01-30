@@ -67,7 +67,7 @@ static void getHSH(float theta, float phi, float* hweights, int order)
         hweights[12] = sqrt(7/(2*M_PI)) *	(-1 + 12*cosTheta - 30*cosTheta2 + 20*cosTheta2*cosTheta);
         hweights[13] = 2*sqrt(21/M_PI)  *	(sqrt(cosTheta - cosTheta2)*(1 - 5*cosTheta + 5*cosTheta2)*sin(phi));
         hweights[14] = sqrt(210/M_PI)  *	(-1 + 2*cosTheta)*(-cosTheta + cosTheta2)*sin(2*phi);
-        hweights[16] = 2*sqrt(35/M_PI)  *	pow((cosTheta - cosTheta2), (float)1.5)*sin(3*phi);
+        hweights[15] = 2*sqrt(35/M_PI)  *	pow((cosTheta - cosTheta2), (float)1.5)*sin(3*phi);
     }
 }
 
@@ -1491,7 +1491,7 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
 
                 if(ui->fitterMenu->currentIndex()==0 ) {// PTM
                     //relight
-                    float reva;
+                    double reva;
                     int kk= ui->spinBox->value();
                     if(ui->robustMenu->currentIndex()==3){
                         reva = sol_l.at<float>(0)*pow( dirs[kk][0] ,2)+
@@ -1504,7 +1504,7 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                         Vec3b col=image.at<Vec3b>(j,i);
                         float nc = col[0]+col[1]+col[2];
                         for(int k=0;k<3;k++){
-                            val[k] = 3*col[k]*reva/(nc);
+                            val[k] = std::max(0.0,std::min(255.0,3*col[k]*reva/(nc)));
                         }
                         test.at<Vec3b>(j,i)= val;
                     }
@@ -1650,7 +1650,7 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                 else if(ui->fitterMenu->currentIndex()==3){ //HSH
 
                     //relight
-                    float reva;
+                    double reva;
                     int kk= ui->spinBox->value();
 
                     float theta=acos(sqrt(1-pow( dirs[kk][0] ,2) - pow( dirs[kk][1] ,2) )); //angle theta
@@ -1666,7 +1666,8 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                         Vec3b col=image.at<Vec3b>(j,i);
                         float nc = col[0]+col[1]+col[2];
                         for(int k=0;k<3;k++){
-                            val[k] = 3*col[k]*reva/(nc);
+                            val[k] = std::max(0.0,std::min(255.0,3*col[k]*reva/(nc)));
+
                         }
                         test.at<Vec3b>(j,i)= val;
                     }
@@ -1703,7 +1704,7 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
 
             for(int cc=0; cc<3;cc++) { // loop over colors
          //       qDebug() << "test";
-                for(int j=0;j<size[1];j++){
+                for(int j=0;j<size[1];j++){ // pixel loop
                     pdialog.setValue(100*j*cc/(3*size[1]));
                     pdialog.update();
                     for(int i=0;i<size[0];i++)
@@ -1888,7 +1889,7 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
 
                                     getHSH(theta, phi, hweights, 3);
 
-                                    getHSH(0, 0, chweights, 3);
+                       //             getHSH(0, 0, chweights, 3);
 
                                     for(int t=0;t<16;t++){
                                         L_uv.at<float>(k,t)=hweights[t];
@@ -1976,17 +1977,15 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                                         float theta=acos(sqrt(1-pow( dirs[kk][0],2) - pow( dirs[kk][1],2) )); //angle theta
                                         float phi=atan2(dirs[kk][0],dirs[kk][1]);
                                         float hweights[16];
-                                        float chweights[16];
 
                                         getHSH(theta, phi, hweights, 3);
 
                                         for(int t=0;t<16;t++){
                                             L_uv.at<float>(k,t)=hweights[t];
-                                            //qDebug() << chweights[t];
                                         }
-                                        if(type==2)
+                                        if(type==4)
                                             b_l.at<float>(k)= vals[kk]/256.0;
-                                        else if(type==1)
+                                        else if(type==3)
                                             b_l.at<float>(k)= (float)valc[kk];
                                         k++;
                                     }
@@ -2098,7 +2097,7 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                             }
                         }
 
-                        else if(ui->fitterMenu->currentIndex()==1){ //PS
+                        if(ui->fitterMenu->currentIndex()==1){ //PS
 
 
                             float nf = sqrt(sol_l.at<float>(0)*sol_l.at<float>(0)+sol_l.at<float>(1)*sol_l.at<float>(1)+sol_l.at<float>(2)*sol_l.at<float>(2));
@@ -2188,10 +2187,10 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                             //qDebug() << val[2] << " ----- " << albedo.at<unsigned char>(j,i);
                         }
 
-                        else if(ui->fitterMenu->currentIndex()==3){ //HSH
+                        if(ui->fitterMenu->currentIndex()==3){ //HSH
 
                             //relight
-                            float reva;
+                           double reva;
                             int kk= ui->spinBox->value();
 
                             float theta=acos(sqrt(1-pow( dirs[kk][0] ,2) - pow( dirs[kk][1] ,2) )); //angle theta
@@ -2204,7 +2203,10 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                                 for(int p=0; p<16;p++)
                                     reva = reva + sol_l.at<float>(p)*hweights[p];
 
-                                test.at<Vec3b>(j,i)[cc] = reva;
+                                test.at<Vec3b>(j,i)[cc]= std::max(0.0,std::min(255.0,reva));
+
+
+                                 sol_l.release();
                             }
                             else { // save coeffs and images
 
@@ -2235,6 +2237,8 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                 }
                     normals2=normals2+normals/3.0;
             }
+            // end loop over colors
+
             normals=normals2;
             albedos.at(2) = albedo;
             albedos.at(1) = albedog;
@@ -2707,6 +2711,26 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
 
     }
     else{ // COLOR - type>2
+
+
+        if(ui->fitterMenu->currentIndex()==3) {// convert saved coeffs to viewable rti
+            if(ui->robustMenu->currentIndex()==3){ // TEST
+
+                iw->setImage(test);
+                iw->show();
+                cv::cvtColor(test,test, cv::COLOR_BGR2RGB);
+                 imwrite("relighted.png",test);
+
+
+                ui->msgBox->setText("saved relighted image");
+            }
+            else{
+          //  saveRTI_LRGB(lastname,size[0],size[1],1,chroma_img);
+          //  ui->msgBox->setText("saved LRGB .rti file" + lastname);
+            }
+        }
+
+
 
         if(ui->fitterMenu->currentIndex()==0){
 
@@ -3294,7 +3318,7 @@ void apTool::on_showButton_clicked()   // Funzione per relighting
                         double res = rbfcalc2(modelInterpolation, lx, ly);
 
                         for (int k=0; k<3; k++)
-                            val[k] = 3*col[k]*res/(nc);
+                            val[k] = std::max(0.0,std::min(255.0,3*col[k]*res/(nc)));
 
 
                         /*
@@ -3426,7 +3450,8 @@ void apTool::on_showButton_clicked()   // Funzione per relighting
 
                             float nc = col[0]+col[1]+col[2];
 
-                            val[k] = 3*col[k]*avg/(nc*256);
+                            val[k] = 3*col[k]*avg/(nc*255);
+
                         }
                     }
                     else if(ui->viewBox->currentIndex()==2){
@@ -3466,7 +3491,7 @@ void apTool::on_showButton_clicked()   // Funzione per relighting
                         double res = rbfcalc2(modelInterpolation, lx, ly);
 
                         for (int k=0; k<3; k++)
-                            val[k] = 3*col[k]*res/(nc*255);
+                            val[k] = std::min(255.0,std::max(0.0,3*col[k]*res/(nc*255)));
 
                         /*//ORA BANALMENTE PRENDE LA DISTANZA, ORDINA e prende nearst neighbor
                     for(int k=0;k<vec.size();k++){
@@ -3634,7 +3659,7 @@ void apTool::on_showButton_clicked()   // Funzione per relighting
                             // for (int k=0; k<3; k++)
                             //     val[cc] = 3*col[cc]*res/(nc);
 
-                            shownImg.at<Vec3b>(j,i)[cc] = std::min(255.0,res);
+                            shownImg.at<Vec3b>(j,i)[cc] = std::max(0.0,std::min(255.0,res));
 
                             /*//ORA BANALMENTE PRENDE LA DISTANZA, ORDINA e prende nearst neighbor
                 for(int k=0;k<vec.size();k++){
@@ -3699,7 +3724,7 @@ void apTool::on_showButton_clicked()   // Funzione per relighting
 
                             double res = rbfcalc2(modelInterpolation, lx, ly);
 
-                            shownImg.at<Vec3b>(j,i)[cc] = res;
+                            shownImg.at<Vec3b>(j,i)[cc] = std::min(255.0,std::max(0.0,res));
 
 
                             comparedImg.at<Vec3b>(j,i)[cc] = vec[iv[0]];

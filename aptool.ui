@@ -65,16 +65,6 @@
      </item>
      <item>
       <property name="text">
-       <string>HSH - 1 order</string>
-      </property>
-     </item>
-     <item>
-      <property name="text">
-       <string>HSH - 2 order</string>
-      </property>
-     </item>
-     <item>
-      <property name="text">
        <string>HSH - 3 order</string>
       </property>
      </item>
@@ -452,7 +442,7 @@
     <widget class="QLabel" name="label_5">
      <property name="geometry">
       <rect>
-       <x>150</x>
+       <x>160</x>
        <y>170</y>
        <width>81</width>
        <height>20</height>
@@ -465,11 +455,24 @@
     <widget class="QSpinBox" name="spinBox">
      <property name="geometry">
       <rect>
-       <x>10</x>
+       <x>50</x>
        <y>170</y>
        <width>48</width>
        <height>27</height>
       </rect>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_6">
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>170</y>
+       <width>31</width>
+       <height>17</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>test</string>
      </property>
     </widget>
    </widget>
