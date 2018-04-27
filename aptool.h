@@ -53,6 +53,8 @@ private slots:
 
     void on_pushButton_7_clicked();
 
+    void on_fullTestBut_clicked();
+
 private:
     Ui::apTool *ui;
 

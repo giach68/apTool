@@ -1699,8 +1699,8 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
     }
     else{
 
-        // 8 bit RGB
-        if(type==3){
+        // 8 bit RGB - 16 bit RGB
+        if(type==3 || type==4){
 
             for(int cc=0; cc<3;cc++) { // loop over colors
          //       qDebug() << "test";
@@ -1718,8 +1718,14 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                                 dirs[k][2]=dircoeffs[k][6]*i+dircoeffs[k][7]*j+dircoeffs[k][8];
                             }
 
+                        if(type==3){
                         in.readRawData((char*)&valc[0], nimg);
-                        vector<unsigned char> vec (&valc[0], &valc[0]+nimg );
+                     //   vector<unsigned char> vec (&valc[0], &valc[0]+nimg );
+                        }
+                        if(type==4){
+                        in.readRawData((char*)&vals[0], nimg*2);
+                      //  vector<unsigned short> vec (&vals[0], &vals[0]+nimg );
+                        }
 
                         int l=0,ninl=0;
 
@@ -1800,9 +1806,9 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                                         L_uv.at<float>(k,t)=hweights[t];
                                         //qDebug() << chweights[t];
                                     }
-                                    if(type==2)
+                                    if(type==4)
                                         b_l.at<float>(k)= vals[k]/256.0;
-                                    else if(type==1)
+                                    else if(type==3)
                                         b_l.at<float>(k)= (float)valc[k];
                                 }
                             }
@@ -1810,8 +1816,16 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                         }
                         else if( ui->robustMenu->currentIndex()==1 ){  // trimmed fit
 
+                            if(type==3){
+                                vector<unsigned char> vec (&valc[0], &valc[0]+nimg );
                             for (size_t p = 0; p != idx.size(); ++p) idx[p] = p;
                             sort (idx.begin (), idx.end (), compare_index<vector<unsigned char> &>(vec));
+                            }
+                            else if(type==4){
+                                vector<unsigned short> vec (&vals[0], &vals[0]+nimg );
+                                for (size_t p = 0; p != idx.size(); ++p) idx[p] = p;
+                                sort (idx.begin (), idx.end (), compare_index<vector<unsigned short> &>(vec));
+                            }
 
                             ninl=nimg-8;
 
@@ -1895,9 +1909,9 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                                         L_uv.at<float>(k,t)=hweights[t];
                                         //qDebug() << chweights[t];
                                     }
-                                    if(type==2)
+                                    if(type==4)
                                         b_l.at<float>(k)= vals[idx[k]]/256.0;
-                                    else if(type==1)
+                                    else if(type==3)
                                         b_l.at<float>(k)= (float)valc[idx[k]];
                                 }
                             }
@@ -2042,7 +2056,7 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                                 float speck=0, shy=0, she=0, stand=0;
                                 float diffe,thr;
                                 for (int k=0; k<nimg;k++){
-                                    if(type==2)
+                                    if(type==4)
                                         diffe= vals[k]/256.0;
                                     else
                                         diffe = valc[k];
@@ -2127,7 +2141,7 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                             float diffe,thr;
 
                             for (int k=0; k<nimg;k++){
-                                if(type==2)
+                                if(type==4)
                                     diffe= vals[k]/256.0;
                                 else
                                     diffe = valc[k];
@@ -2247,7 +2261,7 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
 
         }
 
-        if(type==4){
+        if(type==14){
             // 16 bit RGB
 
             for(int cc=0; cc<3;cc++) { // loop over colors
@@ -2610,7 +2624,10 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
         if(ui->fitterMenu->currentIndex()==3) {// convert saved coeffs to viewable rti
             if(ui->robustMenu->currentIndex()==3){ // TEST
 
-                imwrite("relighted.png",test);
+                QString name1 = "relighted_HSH_" + QString::number(ui->spinBox->value()) + ".png";
+
+                 imwrite(name1.toStdString(),test);
+             
                 cv::cvtColor(test,test, cv::COLOR_BGR2RGB);
                 iw->setImage(test);
                 iw->show();
@@ -2627,7 +2644,10 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
         if(ui->fitterMenu->currentIndex()==0)
             if(ui->robustMenu->currentIndex()==3){
 
-                imwrite("relighted.png",test);
+                QString name1 = "relighted_PTM_" + QString::number(ui->spinBox->value()) + ".png";
+
+                 imwrite(name1.toStdString(),test);
+
                 cv::cvtColor(test,test, cv::COLOR_BGR2RGB);
                 iw->setImage(test);
                 iw->show();
@@ -3185,7 +3205,8 @@ void apTool::on_showButton_clicked()   // Funzione per relighting
 
         lx=dirs[ui->spinBox->value()][0];
         ly=dirs[ui->spinBox->value()][1];
-        for(int k=0;k<nimg;k++){
+
+        for(int k = 0; k < nimg; k++){
             float dv=(lx-dirs[k][0])*(lx-dirs[k][0])+(ly-dirs[k][1])*(ly-dirs[k][1])+(lz-dirs[k][2])*(lz-dirs[k][2]);
             dist.push_back(dv);
         }
@@ -3883,10 +3904,18 @@ void apTool::on_showButton_clicked()   // Funzione per relighting
 
     filed.close();
     cv::cvtColor(shownImg,shownImg, cv::COLOR_BGR2RGB);
-    imwrite("result.png",shownImg);
+
+
     if(ui->viewBox->currentIndex()==4)
     { cv::cvtColor(comparedImg,comparedImg, cv::COLOR_BGR2RGB);
-        imwrite("compared.png",comparedImg);}
+       QString name1 = "original_" + QString::number(ui->spinBox->value()) + ".png";
+        imwrite(name1.toStdString(),comparedImg);
+      name1 = "relightedRBF_"  + QString::number(ui->rbfSpinBox->value()) + "_" + QString::number(ui->spinBox->value())  + ".png";
+
+        imwrite(name1.toStdString(),shownImg);
+    }
+    else
+     imwrite("result.png",shownImg);
 }
 
 void apTool::on_pushButton_6_clicked()
@@ -4425,4 +4454,19 @@ QPixmap apTool::drawLWidget() {
     painter.drawEllipse(rectangle);
     return image;
 
+}
+
+void apTool::on_fullTestBut_clicked()
+{
+    for(int i=0; i<49; i++){
+        ui->robustMenu->setCurrentIndex(3);
+        ui->viewBox->setCurrentIndex(4);
+        ui->spinBox->setValue(i);
+        ui->fitterMenu->setCurrentIndex(0);
+        ui->processButton->click();
+         ui->fitterMenu->setCurrentIndex(3);
+         ui->processButton->click();
+        ui->showButton->click();
+
+    }
 }
