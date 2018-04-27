@@ -4464,8 +4464,11 @@ void apTool::on_fullTestBut_clicked()
         ui->spinBox->setValue(i);
         ui->fitterMenu->setCurrentIndex(0);
         ui->processButton->click();
-         ui->fitterMenu->setCurrentIndex(3);
-         ui->processButton->click();
+        ui->fitterMenu->setCurrentIndex(3);
+        ui->processButton->click();
+        ui->rbfSpinBox->setValue(0.3);
+        ui->showButton->click();
+        ui->rbfSpinBox->setValue(0.6);
         ui->showButton->click();
 
     }
