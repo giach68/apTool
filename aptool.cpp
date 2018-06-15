@@ -1516,7 +1516,7 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
 
                         float lx = ui->lxSpinBox->value();
                         float ly = ui->lySpinBox->value();
-                        float lz = (1-lx*lx-ly*ly);
+                        float lz = sqrt(1-lx*lx-ly*ly);
                             reva = sol_l.at<float>(0)*pow( lx ,2)+
                                     sol_l.at<float>(1)*pow( ly,2)+
                                     sol_l.at<float>(2)*(lx * ly)+
@@ -1600,7 +1600,7 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
 
                     float lx = ui->lxSpinBox->value();
                     float ly = ui->lySpinBox->value();
-                    float lz = (1-lx*lx-ly*ly);
+                    float lz = sqrt(1-lx*lx-ly*ly);
 
                     float nf = sqrt(sol_l.at<float>(0)*sol_l.at<float>(0)+sol_l.at<float>(1)*sol_l.at<float>(1)+sol_l.at<float>(2)*sol_l.at<float>(2));
                     float coe=nf;
@@ -1713,7 +1713,7 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                         reva = 0;
                         float lx = ui->lxSpinBox->value();
                         float ly = ui->lySpinBox->value();
-                        float lz = (1-lx*lx-ly*ly);
+                        float lz = sqrt(1-lx*lx-ly*ly);
                         float theta=acos(sqrt(lz)); //angle theta
                         float phi=atan2(lx,ly);
                         float hweights[16];
@@ -2109,7 +2109,7 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
 
                                 float lx = ui->lxSpinBox->value();
                                 float ly = ui->lySpinBox->value();
-                                float lz = (1-lx*lx-ly*ly);
+                                float lz = sqrt(1-lx*lx-ly*ly);
 
                                 reva = sol_l.at<float>(0)*pow( lx ,2)+
                                         sol_l.at<float>(1)*pow( ly,2)+
@@ -2192,7 +2192,7 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
 
                             float lx = ui->lxSpinBox->value();
                             float ly = ui->lySpinBox->value();
-                            float lz = (1-lx*lx-ly*ly);
+                            float lz = sqrt(1-lx*lx-ly*ly);
 
                             float va = (lx*sol_l.at<float>(0)+ly*sol_l.at<float>(1)+lz*sol_l.at<float>(2));
 
@@ -2318,7 +2318,7 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
 
                                 float lx = ui->lxSpinBox->value();
                                 float ly = ui->lySpinBox->value();
-                                float lz = (1-lx*lx-ly*ly);
+                                float lz = sqrt(1-lx*lx-ly*ly);
 
                                double reva;
                                 int kk= ui->spinBox->value();
@@ -3200,7 +3200,7 @@ void apTool::on_showButton_clicked()   // Funzione per relighting
     Vec3f val;
     Vec3f valcomp;
     Vec3f dire;
-    vector <float> dist;
+    vector <double> dist;
     unsigned char* valc = new unsigned char[nimg];
     unsigned short* vals = new unsigned short[nimg];
     unsigned char** colc = new unsigned char*[3];
@@ -3346,7 +3346,7 @@ void apTool::on_showButton_clicked()   // Funzione per relighting
 
     float lx = ui->lxSpinBox->value();
     float ly = ui->lySpinBox->value();
-    float lz = (1-lx*lx-ly*ly);
+    float lz = sqrt(1-lx*lx-ly*ly);
 
     if(ui->viewBox->currentIndex()==2){
 
@@ -3358,7 +3358,7 @@ void apTool::on_showButton_clicked()   // Funzione per relighting
 
         iv.resize(nimg);
         for (size_t p = 0; p != iv.size(); ++p) iv[p] = p;
-        sort (iv.begin (), iv.end (), compare_index<vector<float> &>(dist));
+        sort (iv.begin (), iv.end (), compare_index<vector<double> &>(dist));
         dist.clear();
 
     }
@@ -3368,17 +3368,17 @@ void apTool::on_showButton_clicked()   // Funzione per relighting
         int hh=ui->spinBox->value();
         lx=dirs[ui->spinBox->value()][0];
         ly=dirs[ui->spinBox->value()][1];
-        lz = (1-lx*lx-ly*ly);
+        lz = sqrt(1-lx*lx-ly*ly);
 
         dist.clear();
         for(int k = 0; k < nimg; k++){
-            float dv=(lx-dirs[k][0])*(lx-dirs[k][0])+(ly-dirs[k][1])*(ly-dirs[k][1])+(lz-dirs[k][2])*(lz-dirs[k][2]);
+            double dv=(lx-dirs[k][0])*(lx-dirs[k][0])+(ly-dirs[k][1])*(ly-dirs[k][1])+(lz-dirs[k][2])*(lz-dirs[k][2]);
             dist.push_back(dv);
         }
 
         iv.resize(nimg);
         for (size_t p = 0; p != iv.size(); ++p) iv[p] = p;
-        sort (iv.begin (), iv.end (), compare_index<vector<float> &>(dist));
+        sort (iv.begin (), iv.end (), compare_index<vector<double> &>(dist));
         dist.clear();
 
     }
