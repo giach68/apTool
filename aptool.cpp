@@ -3344,15 +3344,15 @@ void apTool::on_showButton_clicked()   // Funzione per relighting
     real_2d_array arrayInterpolation;
     vector<size_t> iv;
 
-    float lx = ui->lxSpinBox->value();
-    float ly = ui->lySpinBox->value();
-    float lz = sqrt(1-lx*lx-ly*ly);
+    double lx = ui->lxSpinBox->value();
+    double ly = ui->lySpinBox->value();
+    double lz = sqrt(1-lx*lx-ly*ly);
 
     if(ui->viewBox->currentIndex()==2){
 
 
         for(int k=0;k<nimg;k++){
-            float dv=(lx-dirs[k][0])*(lx-dirs[k][0])+(ly-dirs[k][1])*(ly-dirs[k][1])+(lz-dirs[k][2])*(lz-dirs[k][2]);
+            double dv=(lx-dirs[k][0])*(lx-dirs[k][0])+(ly-dirs[k][1])*(ly-dirs[k][1])+(lz-dirs[k][2])*(lz-dirs[k][2]);
             dist.push_back(dv);
         }
 
