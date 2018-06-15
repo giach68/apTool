@@ -151,6 +151,11 @@
        <string>LO map</string>
       </property>
      </item>
+     <item>
+      <property name="text">
+       <string>Relighted</string>
+      </property>
+     </item>
     </widget>
     <widget class="QLabel" name="label_4">
      <property name="geometry">

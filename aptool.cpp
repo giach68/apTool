@@ -667,6 +667,7 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
     //   cv::cvtColor(image,image, cv::COLOR_BGR2RGB);
 
     Mat test(size[1],size[0],CV_8UC3);
+    Mat relight(size[1],size[0],CV_8UC3);
     Mat him(size[1],size[0],CV_8UC3);
     Mat shim(size[1],size[0],CV_8UC3);
     Mat outlim(size[1],size[0],CV_8UC3);
@@ -938,7 +939,6 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
 
                         int aa=0;
                         float avgd=0, avgd2=0, avgv=0, avgv2=0;
-
 
                         for(int p=0;p<nimg;p++){
                             avgd2 += dp[p][k];
@@ -1510,6 +1510,29 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                     }
                     else {
 
+
+                        // estimate relighted
+                        double reva;
+
+                        float lx = ui->lxSpinBox->value();
+                        float ly = ui->lySpinBox->value();
+                        float lz = (1-lx*lx-ly*ly);
+                            reva = sol_l.at<float>(0)*pow( lx ,2)+
+                                    sol_l.at<float>(1)*pow( ly,2)+
+                                    sol_l.at<float>(2)*(lx * ly)+
+                                    sol_l.at<float>(3)*lx+
+                                    sol_l.at<float>(4)*ly+
+                                    sol_l.at<float>(5);
+
+                            Vec3b col=image.at<Vec3b>(j,i);
+                            float nc = col[0]+col[1]+col[2];
+                            for(int k=0;k<3;k++){
+                                val[k] = std::max(0.0,std::min(255.0,3*col[2-k]*reva/(nc)));
+                            }
+
+                        relight.at<Vec3b>(j,i)= val;
+
+
                         albedo.at<unsigned char>(j,i) = (unsigned char)sol_l.at<float>(5);
 
                         float speck=0, shy=0, she=0, stand=0;
@@ -1540,8 +1563,7 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                                         +sol_l.at<float>(2)*dirs[k][2]
                                         +sol_l.at<float>(3)*pow( dirs[k][0] ,2)
                                         +sol_l.at<float>(4)*(dirs[k][0] * dirs[k][1])
-                                        +sol_l.at<float>(5));
-
+                                        +sol_l.at<float>(5));                           
 
                             stand=stand+diffe*diffe;
 
@@ -1576,10 +1598,14 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                 else if(ui->fitterMenu->currentIndex()==1){ //PS
 
 
+                    float lx = ui->lxSpinBox->value();
+                    float ly = ui->lySpinBox->value();
+                    float lz = (1-lx*lx-ly*ly);
 
                     float nf = sqrt(sol_l.at<float>(0)*sol_l.at<float>(0)+sol_l.at<float>(1)*sol_l.at<float>(1)+sol_l.at<float>(2)*sol_l.at<float>(2));
                     float coe=nf;
                     outcoef.write((char*)&coe,sizeof(float));
+                    float va = (lx*sol_l.at<float>(0)+ly*sol_l.at<float>(1)+lz*sol_l.at<float>(2));
 
                     coe=sol_l.at<float>(0)/nf;
                     outcoef1.write((char*)&coe,sizeof(float));
@@ -1598,6 +1624,15 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                     normals.at<Vec3b>(j,i) = val;
                     albedo.at<unsigned char>(j,i) = 0.6*nf;
 
+
+                    // estimate relighted
+                    Vec3b col=image.at<Vec3b>(j,i);
+                    float nc = col[0]+col[1]+col[2];
+                    for(int k=0;k<3;k++){
+                        val[k] = std::max(0.0,std::min(255.0,double(col[2-k]*va)));
+                    }
+
+                    relight.at<Vec3b>(j,i)=val ;
 
                     // estimating features
                     float speck=0, shy=0, she=0, stand=0;
@@ -1646,8 +1681,10 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
 
                     outlim.at<Vec3b>(j,i)= val;
 
+
+
                 }
-                else if(ui->fitterMenu->currentIndex()==3){ //HSH
+                else if(ui->fitterMenu->currentIndex()==3){ //HSH 16
 
                     //relight
                     double reva;
@@ -1672,6 +1709,26 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                         test.at<Vec3b>(j,i)= val;
                     }
                     else { // save coeffs and images
+                        // estimate relighted
+                        reva = 0;
+                        float lx = ui->lxSpinBox->value();
+                        float ly = ui->lySpinBox->value();
+                        float lz = (1-lx*lx-ly*ly);
+                        float theta=acos(sqrt(lz)); //angle theta
+                        float phi=atan2(lx,ly);
+                        float hweights[16];
+                        getHSH(theta, phi, hweights, 3);
+
+                        for(int p=0; p<16;p++)
+                            reva = reva + sol_l.at<float>(p)*hweights[p];
+
+                        Vec3b col=image.at<Vec3b>(j,i);
+                        float nc = col[0]+col[1]+col[2];
+                        for(int k=0;k<3;k++){
+                            val[k] = std::max(0.0,std::min(255.0,3*col[2-k]*reva/(nc)));
+
+                        }
+                        relight.at<Vec3b>(j,i)= val;
 
                         outcoef.write((char*)&sol_l.at<float>(0),sizeof(float));
                         outcoef1.write((char*)&sol_l.at<float>(1),sizeof(float));
@@ -1694,6 +1751,10 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
 
 
                 } ////
+
+                else if(ui->fitterMenu->currentIndex()==4){ // HSH 9?
+
+                }
 
             }
     }
@@ -2046,6 +2107,20 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                             }
                             else {  // regular PTM estimate and save features
 
+                                float lx = ui->lxSpinBox->value();
+                                float ly = ui->lySpinBox->value();
+                                float lz = (1-lx*lx-ly*ly);
+
+                                reva = sol_l.at<float>(0)*pow( lx ,2)+
+                                        sol_l.at<float>(1)*pow( ly,2)+
+                                        sol_l.at<float>(2)*(lx*ly)+
+                                        sol_l.at<float>(3)*lx+
+                                        sol_l.at<float>(4)*ly+
+                                        sol_l.at<float>(5);
+
+                                relight.at<Vec3b>(j,i)[cc]= std::max(0.0,std::min(255.0,reva));
+
+
                                 if(cc==0)
                                     albedo.at<unsigned char>(j,i) = (unsigned char)sol_l.at<float>(5);
                                 if(cc==1)
@@ -2108,11 +2183,18 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                                     val[k]=speck+shy;
 
                                 outlim.at<Vec3b>(j,i)= val;
+                                 sol_l.release();
                             }
                         }
 
                         if(ui->fitterMenu->currentIndex()==1){ //PS
 
+
+                            float lx = ui->lxSpinBox->value();
+                            float ly = ui->lySpinBox->value();
+                            float lz = (1-lx*lx-ly*ly);
+
+                            float va = (lx*sol_l.at<float>(0)+ly*sol_l.at<float>(1)+lz*sol_l.at<float>(2));
 
                             float nf = sqrt(sol_l.at<float>(0)*sol_l.at<float>(0)+sol_l.at<float>(1)*sol_l.at<float>(1)+sol_l.at<float>(2)*sol_l.at<float>(2));
                             float coe;
@@ -2183,6 +2265,10 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
 
                             outlim.at<Vec3b>(j,i)= val;
 
+
+
+                            relight.at<Vec3b>(j,i)[cc]= std::max(0.0,std::min(255.0,double(va)));
+
                         }
 
                         if(ui->fitterMenu->currentIndex()==2){ // DREW PTM features
@@ -2212,6 +2298,10 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                             float hweights[16];
                             getHSH(theta, phi, hweights, 3);
 
+                           // if(i==100 || i==1450)
+                             //   qDebug() << hweights[0] << " " << hweights[0] << " " << hweights[1] << " " << hweights[2] << " " << hweights[3] << " " << hweights[4] << " " << hweights[5] << " ";
+                                //qDebug() << j << " -- " << theta << " " << phi;
+
                             if(ui->robustMenu->currentIndex()==3){
                                 reva = 0;
                                 for(int p=0; p<16;p++)
@@ -2223,6 +2313,34 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                                  sol_l.release();
                             }
                             else { // save coeffs and images
+
+                                //relight
+
+                                float lx = ui->lxSpinBox->value();
+                                float ly = ui->lySpinBox->value();
+                                float lz = (1-lx*lx-ly*ly);
+
+                               double reva;
+                                int kk= ui->spinBox->value();
+
+                                float theta=acos(lz); //angle theta
+                                float phi=atan2(lx,ly);
+                                float hweights[16];
+                                getHSH(theta, phi, hweights, 3);
+
+                                    reva = 0;
+                                    for(int p=0; p<16;p++)
+                                        reva = reva + sol_l.at<float>(p)*hweights[p];
+
+                                    relight.at<Vec3b>(j,i)[cc]= std::max(0.0,std::min(255.0,reva));
+
+                                        for (int k=0;k<16;k++){
+                                            if (cvIsNaN(sol_l.at<float>(k))==1){
+                                                sol_l.at<float>(k)=0;
+                                                qDebug()<< "NAN";
+                                            }}
+
+
 
                                 outcoef.write((char*)&sol_l.at<float>(0),sizeof(float));
                                 outcoef1.write((char*)&sol_l.at<float>(1),sizeof(float));
@@ -2633,8 +2751,14 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                 iw->show();
 
                 ui->msgBox->setText("saved relighted image");
+                ui->msgBox->setText(name1);
             }
             else{
+
+                if(ui->fitViewBox->currentIndex()==5){
+                    iw->setImage(relight);
+                    iw->show();
+                }
             saveRTI_LRGB(lastname,size[0],size[1],1,chroma_img);
             ui->msgBox->setText("saved LRGB .rti file" + lastname);
             }
@@ -2642,7 +2766,7 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
 
 
         if(ui->fitterMenu->currentIndex()==0)
-            if(ui->robustMenu->currentIndex()==3){
+            if(ui->robustMenu->currentIndex()==3){ //TEST
 
                 QString name1 = "relighted_PTM_" + QString::number(ui->spinBox->value()) + ".png";
 
@@ -2658,6 +2782,7 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                 savePTM_LRGB(lastname,size[0],size[1],chroma_img);
 
                 ui->msgBox->setText("saved LRGB .ptm file" + lastname);
+
 
             }
 
@@ -2695,6 +2820,10 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                     iw->setImage(outlim);
                     iw->show();
                 }
+                if(ui->fitViewBox->currentIndex()==5){
+                    iw->setImage(relight);
+                    iw->show();
+                }
 
             }
 
@@ -2719,8 +2848,14 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                     iw->setImage(outlim);
                     iw->show();
                 }
+                if(ui->fitViewBox->currentIndex()==5){
+                    iw->setImage(relight);
+                    iw->show();
+                }
 
             }
+
+
 
         if(ui->fitterMenu->currentIndex()<3 && ui->robustMenu->currentIndex()!= 3){
             imwrite("him.png",him);
@@ -2739,12 +2874,20 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                 iw->setImage(test);
                 iw->show();
                 cv::cvtColor(test,test, cv::COLOR_BGR2RGB);
-                 imwrite("relighted.png",test);
+                // imwrite("relighted.png",test);
+                  QString name1 = "relighted_HSH_" + QString::number(ui->spinBox->value()) + ".png";
+
+                 imwrite(name1.toStdString(),test);
 
 
                 ui->msgBox->setText("saved relighted image");
             }
             else{
+
+                if(ui->fitViewBox->currentIndex()==5){
+                    iw->setImage(relight);
+                    iw->show();
+                }
           //  saveRTI_LRGB(lastname,size[0],size[1],1,chroma_img);
           //  ui->msgBox->setText("saved LRGB .rti file" + lastname);
             }
@@ -2757,17 +2900,19 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
             // convert saved coeffs to viewable ptm
 
             savePTM_RGB(lastname,size[0],size[1]);
-            cv::Mat colorImage;
 
 
-            if(ui->fitViewBox->currentIndex()==4){
-                iw->setImage(test);
-                iw->show();
-            }
-            if(ui->fitViewBox->currentIndex()==3){
-                iw->setImage(outlim);
-                iw->show();
-            }
+            // cv::Mat colorImage;
+
+
+//            if(ui->fitViewBox->currentIndex()==4){
+//                iw->setImage(test);
+//                iw->show();
+//            }
+//            if(ui->fitViewBox->currentIndex()==3){
+//                iw->setImage(outlim);
+//                iw->show();
+//            }
 
             // cv::merge(albedos, colorImage);
             // imwrite("albedo.png",colorImage);
@@ -2778,11 +2923,15 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
             //                iw->show();
             //            }
         }
-        if(ui->fitterMenu->currentIndex()==1  || ui->fitterMenu->currentIndex()==2){
+
+        if(ui->fitterMenu->currentIndex()==1  || ui->fitterMenu->currentIndex()==2){//PS o drew
             if(ui->robustMenu->currentIndex()==3){
+
+
+
                 iw->setImage(test);
                 iw->show();
-                imwrite("relighted.png",test);
+               imwrite("relighted.png",test);
             }
             else {
 
@@ -2814,6 +2963,11 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                     iw->show();
                 }
 
+
+                if(ui->fitViewBox->currentIndex()==5){
+                    iw->setImage(relight);
+                    iw->show();
+                }
                 imwrite("him.png",him);
                 imwrite("shim.png",shim);
                 imwrite("outlim.png",outlim);
@@ -2827,8 +2981,12 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                 iw->setImage(test);
                 iw->show();
                 ui->msgBox->setText("saved relighted image");
+                  QString name1 = "relighted_PTM_" + QString::number(ui->spinBox->value()) + ".png";
+
+
                 cv::cvtColor(test,test, cv::COLOR_BGR2RGB);
-                imwrite("relighted.png",test);
+                 imwrite(name1.toStdString(),test);
+               // imwrite("relighted.png",test);
             }
             else{
 
@@ -2847,6 +3005,10 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                     iw->show();
                 }
 
+                if(ui->fitViewBox->currentIndex()==5){
+                    iw->setImage(relight);
+                    iw->show();
+                }
                 imwrite("him.png",him);
                 imwrite("shim.png",shim);
                 imwrite("outlim.png",outlim);
@@ -3203,9 +3365,12 @@ void apTool::on_showButton_clicked()   // Funzione per relighting
 
     if(ui->viewBox->currentIndex()==4){
 
+        int hh=ui->spinBox->value();
         lx=dirs[ui->spinBox->value()][0];
         ly=dirs[ui->spinBox->value()][1];
+        lz = (1-lx*lx-ly*ly);
 
+        dist.clear();
         for(int k = 0; k < nimg; k++){
             float dv=(lx-dirs[k][0])*(lx-dirs[k][0])+(ly-dirs[k][1])*(ly-dirs[k][1])+(lz-dirs[k][2])*(lz-dirs[k][2]);
             dist.push_back(dv);
@@ -4458,7 +4623,9 @@ QPixmap apTool::drawLWidget() {
 
 void apTool::on_fullTestBut_clicked()
 {
-    for(int i=0; i<49; i++){
+    for(int i=0; i<48; i++){
+
+
         ui->robustMenu->setCurrentIndex(3);
         ui->viewBox->setCurrentIndex(4);
         ui->spinBox->setValue(i);
@@ -4466,6 +4633,7 @@ void apTool::on_fullTestBut_clicked()
         ui->processButton->click();
         ui->fitterMenu->setCurrentIndex(3);
         ui->processButton->click();
+
         ui->rbfSpinBox->setValue(0.3);
         ui->showButton->click();
         ui->rbfSpinBox->setValue(0.6);
