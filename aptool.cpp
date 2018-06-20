@@ -611,7 +611,10 @@ void apTool::on_processButton_clicked()
                     dirs[i][1]=dircoeffs[i][3]*c_x+dircoeffs[i][4]*c_y+dircoeffs[i][5];
                     dirs[i][2]=dircoeffs[i][6]*c_x+dircoeffs[i][7]*c_y+dircoeffs[i][8];
                     // qDebug() << dirs[i][0] << " " << dirs[i][1] << " "  << dirs[i][2];
+          //          double nofa=sqrt(  dirs[i][0]*dirs[i][0]+dirs[i][1]*dirs[i][1]+dirs[i][2]*dirs[i][2]);
 
+                //   for(int j=0;j<3;j++)
+                 //           dirs[i][j]=dirs[i][j]/nofa;
 
                 }
             }
@@ -632,9 +635,10 @@ void apTool::on_processButton_clicked()
                         return;
                     }
 
-                    dirs[i][0]=parts[0].toFloat();
-                    dirs[i][1]=parts[1].toFloat();
-                    dirs[i][2]=parts[2].toFloat();
+                    double nofa=sqrt(parts[0].toFloat()*parts[0].toFloat()+parts[1].toFloat()*parts[1].toFloat()+parts[2].toFloat()*parts[2].toFloat());
+                    dirs[i][0]=parts[0].toFloat()/nofa;
+                    dirs[i][1]=parts[1].toFloat()/nofa;
+                    dirs[i][2]=parts[2].toFloat()/nofa;
 
                 }
             }
@@ -900,7 +904,13 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                         dirs[k][0]=dircoeffs[k][0]*i+dircoeffs[k][1]*j+dircoeffs[k][2];
                         dirs[k][1]=dircoeffs[k][3]*i+dircoeffs[k][4]*j+dircoeffs[k][5];
                         dirs[k][2]=dircoeffs[k][6]*i+dircoeffs[k][7]*j+dircoeffs[k][8];
+
+                        double nofa=sqrt(  dirs[k][0]*dirs[k][0]+dirs[k][1]*dirs[k][1]+dirs[k][2]*dirs[k][2]);
+
+                       for(int uu=0;uu<3;uu++)
+                                dirs[k][uu]=dirs[k][uu]/nofa;
                     }
+
 
                 // 8 bit
                 if(type==1){
