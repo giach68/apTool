@@ -610,11 +610,11 @@ void apTool::on_processButton_clicked()
                     dirs[i][0]=dircoeffs[i][0]*c_x+dircoeffs[i][1]*c_y+dircoeffs[i][2];
                     dirs[i][1]=dircoeffs[i][3]*c_x+dircoeffs[i][4]*c_y+dircoeffs[i][5];
                     dirs[i][2]=dircoeffs[i][6]*c_x+dircoeffs[i][7]*c_y+dircoeffs[i][8];
-                    // qDebug() << dirs[i][0] << " " << dirs[i][1] << " "  << dirs[i][2];
-          //          double nofa=sqrt(  dirs[i][0]*dirs[i][0]+dirs[i][1]*dirs[i][1]+dirs[i][2]*dirs[i][2]);
 
-                //   for(int j=0;j<3;j++)
-                 //           dirs[i][j]=dirs[i][j]/nofa;
+                    double nofa=sqrt(  dirs[i][0]*dirs[i][0]+dirs[i][1]*dirs[i][1]+dirs[i][2]*dirs[i][2]);
+
+                   for(int j=0;j<3;j++)
+                            dirs[i][j]=dirs[i][j]/nofa;
 
                 }
             }
@@ -772,7 +772,9 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
     write_Triads(triads, "triangles.txt");
     // triangulation in the first space
 
-    std::vector<Triad> triad2;
+  /* other triangulation in different space
+
+     std::vector<Triad> triad2;
 
     std::vector<int> outx2;
 
@@ -780,7 +782,7 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
 
     int t2 = s_hull_pro( ptt, triad2);
     // triangulation in the second space
-
+*/
     /* Test saving light points triangulation (works!)*/
     if(0){
         ofstream om;
@@ -3162,6 +3164,12 @@ void apTool::on_showButton_clicked()   // Funzione per relighting
                     dirs[i][0]=dircoeffs[i][0]*c_x+dircoeffs[i][1]*c_y+dircoeffs[i][2];
                     dirs[i][1]=dircoeffs[i][3]*c_x+dircoeffs[i][4]*c_y+dircoeffs[i][5];
                     dirs[i][2]=dircoeffs[i][6]*c_x+dircoeffs[i][7]*c_y+dircoeffs[i][8];
+
+                    double nofa=sqrt(  dirs[i][0]*dirs[i][0]+dirs[i][1]*dirs[i][1]+dirs[i][2]*dirs[i][2]);
+
+                   for(int j=0;j<3;j++)
+                            dirs[i][j]=dirs[i][j]/nofa;
+
                     qDebug() << dirs[i][0] << " " << dirs[i][1] << " "  << dirs[i][2];
 
                     // computing interpolated direction in the center
@@ -3190,6 +3198,11 @@ void apTool::on_showButton_clicked()   // Funzione per relighting
                     dirs[i][0]=parts[0].toFloat();
                     dirs[i][1]=parts[1].toFloat();
                     dirs[i][2]=parts[2].toFloat();
+
+                    double nofa=sqrt(  dirs[i][0]*dirs[i][0]+dirs[i][1]*dirs[i][1]+dirs[i][2]*dirs[i][2]);
+
+                   for(int j=0;j<3;j++)
+                            dirs[i][j]=dirs[i][j]/nofa;
 
                 }
             }
