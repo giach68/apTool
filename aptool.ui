@@ -17,8 +17,8 @@
    <widget class="QPushButton" name="pushButton">
     <property name="geometry">
      <rect>
-      <x>50</x>
-      <y>0</y>
+      <x>20</x>
+      <y>10</y>
       <width>111</width>
       <height>27</height>
      </rect>
@@ -31,8 +31,8 @@
     <property name="geometry">
      <rect>
       <x>20</x>
-      <y>30</y>
-      <width>551</width>
+      <y>40</y>
+      <width>571</width>
       <height>61</height>
      </rect>
     </property>
@@ -43,7 +43,7 @@
      <property name="geometry">
       <rect>
        <x>30</x>
-       <y>20</y>
+       <y>30</y>
        <width>85</width>
        <height>27</height>
       </rect>
@@ -78,7 +78,7 @@
      <property name="geometry">
       <rect>
        <x>130</x>
-       <y>20</y>
+       <y>30</y>
        <width>85</width>
        <height>27</height>
       </rect>
@@ -108,7 +108,7 @@
      <property name="geometry">
       <rect>
        <x>230</x>
-       <y>20</y>
+       <y>30</y>
        <width>99</width>
        <height>27</height>
       </rect>
@@ -120,8 +120,8 @@
     <widget class="QComboBox" name="fitViewBox">
      <property name="geometry">
       <rect>
-       <x>450</x>
-       <y>20</y>
+       <x>430</x>
+       <y>30</y>
        <width>85</width>
        <height>27</height>
       </rect>
@@ -160,7 +160,7 @@
     <widget class="QLabel" name="label_4">
      <property name="geometry">
       <rect>
-       <x>400</x>
+       <x>390</x>
        <y>20</y>
        <width>41</width>
        <height>17</height>
@@ -351,7 +351,7 @@
      <property name="geometry">
       <rect>
        <x>410</x>
-       <y>10</y>
+       <y>30</y>
        <width>151</width>
        <height>151</height>
       </rect>
@@ -428,7 +428,7 @@
     <widget class="QDoubleSpinBox" name="rbfSpinBox">
      <property name="geometry">
       <rect>
-       <x>238</x>
+       <x>240</x>
        <y>170</y>
        <width>71</width>
        <height>21</height>
@@ -497,9 +497,9 @@
    <widget class="QLineEdit" name="fileNameLine">
     <property name="geometry">
      <rect>
-      <x>170</x>
-      <y>0</y>
-      <width>361</width>
+      <x>140</x>
+      <y>10</y>
+      <width>451</width>
       <height>27</height>
      </rect>
     </property>
@@ -521,7 +521,7 @@
      <x>0</x>
      <y>0</y>
      <width>604</width>
-     <height>25</height>
+     <height>22</height>
     </rect>
    </property>
   </widget>

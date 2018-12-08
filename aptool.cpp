@@ -17,7 +17,7 @@
 #include <qtextstream.h>
 #include "s_hull_pro.h"
 #include <math.h>
-#include "stdafx.h"
+//#include "stdafx.h"
 #include <stdlib.h>
 #include "interpolation.h"
 #include "lwidget.h"
@@ -2869,11 +2869,23 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
 
 
 
+        cv::Mat patch, patchi;
         if(ui->fitterMenu->currentIndex()<3 && ui->robustMenu->currentIndex()!= 3){
             imwrite("him.png",him);
             imwrite("shim.png",shim);
             imwrite("outlim.png",outlim);
             imwrite("residual.png",test);
+
+            for(int i=0; i<him.cols; i+=21)
+                for(int j=0; j<him.rows; j+=21){
+                    cv::Rect roi(i,j,20, 20);
+                    patch = test(roi);
+                    patchi = albedo(roi);
+                    Scalar m,d;
+                    meanStdDev(patch, m, d);
+                    //pRoi.setTo(cv::Scalar(blue, green, red));
+                    //image_roi2.copyTo( image_roi );
+                }
         }
 
     }
@@ -4646,7 +4658,7 @@ QPixmap apTool::drawLWidget() {
 
 void apTool::on_fullTestBut_clicked()
 {
-    for(int i=0; i<48; i++){
+    for(int i=0; i<54; i++){
 
 
         ui->robustMenu->setCurrentIndex(3);
