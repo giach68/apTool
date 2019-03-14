@@ -4676,3 +4676,54 @@ void apTool::on_fullTestBut_clicked()
 
     }
 }
+
+void apTool::on_pushButton_8_clicked()
+{
+    QString fileName;
+
+    fileName = QFileDialog::getOpenFileName(this,
+                                            tr("Open grid file"));
+    ui->gridEdit->setText(fileName);
+}
+
+void apTool::on_resampleButton_clicked()
+{
+    QString filename = ui->gridEdit->text();
+    QFile file(filename);
+    QTextStream textStream(&file);
+    QString line="aa";
+    QStringList parts;
+
+    qDebug() << filename;
+
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+        return;
+
+    ui->viewBox->setCurrentIndex(2);
+    int i=1;
+    while(!(line.isNull())){
+        line = textStream.readLine();
+        parts = line.split(" ");
+        double dire[3];
+        double nofa=sqrt(parts[0].toFloat()*parts[0].toFloat()+parts[1].toFloat()*parts[1].toFloat()+parts[2].toFloat()*parts[2].toFloat());
+        dire[0]=parts[0].toFloat()/nofa;
+        dire[1]=parts[1].toFloat()/nofa;
+        dire[2]=parts[2].toFloat()/nofa;
+
+        this->ui->lxSpinBox->setValue(dire[0]);
+        this->ui->lySpinBox->setValue(dire[1]);
+         ui->showButton->click();
+
+
+         QFile::rename("result.png","grid_" + QString::number(i) + ".png" );
+
+         i++;
+    }
+
+
+}
+
+void apTool::on_viewBox_activated(const QString &arg1)
+{
+
+}

@@ -55,6 +55,12 @@ private slots:
 
     void on_fullTestBut_clicked();
 
+    void on_pushButton_8_clicked();
+
+    void on_resampleButton_clicked();
+
+    void on_viewBox_activated(const QString &arg1);
+
 private:
     Ui::apTool *ui;
 
