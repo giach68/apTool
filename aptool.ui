@@ -32,7 +32,7 @@
      <rect>
       <x>20</x>
       <y>40</y>
-      <width>571</width>
+      <width>481</width>
       <height>61</height>
      </rect>
     </property>
@@ -71,6 +71,11 @@
      <item>
       <property name="text">
        <string>PS - Known normals</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>HSH - Known normals</string>
       </property>
      </item>
     </widget>
@@ -120,7 +125,7 @@
     <widget class="QComboBox" name="fitViewBox">
      <property name="geometry">
       <rect>
-       <x>430</x>
+       <x>390</x>
        <y>30</y>
        <width>85</width>
        <height>27</height>
@@ -160,7 +165,7 @@
     <widget class="QLabel" name="label_4">
      <property name="geometry">
       <rect>
-       <x>390</x>
+       <x>350</x>
        <y>20</y>
        <width>41</width>
        <height>17</height>
@@ -548,6 +553,32 @@
     </property>
     <property name="text">
      <string>Resample</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="zoomButton">
+    <property name="geometry">
+     <rect>
+      <x>510</x>
+      <y>50</y>
+      <width>81</width>
+      <height>25</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Zoom+</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="unzoomButton">
+    <property name="geometry">
+     <rect>
+      <x>510</x>
+      <y>80</y>
+      <width>81</width>
+      <height>25</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Zoom-</string>
     </property>
    </widget>
   </widget>

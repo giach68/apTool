@@ -98,6 +98,11 @@ public:
     QLabel *point1;
     QLabel *point2;
 
+    QAction *loadAct;
+    QAction *zoomInAct;
+    QAction *zoomOutAct;
+
+
 private slots:
     //void open();
     void zoomIn();
@@ -136,9 +141,6 @@ private:
 
     QAction *normalSizeAct;
     //   QAction *aboutAct;
-    QAction *loadAct;
-    QAction *zoomInAct;
-    QAction *zoomOutAct;
 
     QRubberBand *rub1;
 

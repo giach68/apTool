@@ -61,6 +61,10 @@ private slots:
 
     void on_viewBox_activated(const QString &arg1);
 
+    void on_zoomButton_clicked();
+
+    void on_unzoomButton_clicked();
+
 private:
     Ui::apTool *ui;
 

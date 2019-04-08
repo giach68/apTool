@@ -516,12 +516,16 @@ void apTool::on_processButton_clicked()
     int size[2]={0,0};
     int nimg=0;
     Vec3f* dirs;
+    Vec3f* dirsr;
+
     float** dircoeffs;
     QString chroma_img;
 
     // to output binary files with coefficients
-    // Tinsae HERE - if more coeff add related output variable
+
     ofstream outcoef, outcoef1, outcoef2, outcoef3, outcoef4, outcoef5, outcoef6, outcoef7, outcoef8, outcoef9, outcoef10, outcoef11,outcoef12, outcoef13, outcoef14, outcoef15, outcoef16;
+    ifstream nxs, nys, nzs;
+    float norload[3];
 
     // read AP header
 
@@ -639,6 +643,7 @@ void apTool::on_processButton_clicked()
                     dirs[i][0]=parts[0].toFloat()/nofa;
                     dirs[i][1]=parts[1].toFloat()/nofa;
                     dirs[i][2]=parts[2].toFloat()/nofa;
+     // qDebug()<< "gosh " <<  dirs[i][0] << " "  << nofa;
 
                 }
             }
@@ -803,6 +808,7 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
         }
         om.close();
     }
+
     unsigned char nema[nimg][nimg];
     for (int i=0;i<nimg;i++)
         for (int j=0;j<nimg;j++)
@@ -886,8 +892,38 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
         outcoef15.open ("h15.bin", ios::out | ios::binary);
     }
 
-    if(ui->fitterMenu->currentIndex()==4) {return; } // DMD
-    if(ui->fitterMenu->currentIndex()==5) {return; }// 3 order ptm
+    if(ui->fitterMenu->currentIndex()==4) {return; } // PS Known normals
+    if(ui->fitterMenu->currentIndex()==5) { //HSH Known normals
+        dirsr = new Vec3f[nimg];
+
+        outcoef.open ("h0.bin", ios::out | ios::binary);
+        outcoef1.open ("h1.bin", ios::out | ios::binary);
+        outcoef2.open ("h2.bin", ios::out | ios::binary);
+        outcoef3.open ("h3.bin", ios::out | ios::binary);
+        outcoef4.open ("h4.bin", ios::out | ios::binary);
+        outcoef5.open ("h5.bin", ios::out | ios::binary);
+        outcoef6.open ("h6.bin", ios::out | ios::binary);
+        outcoef7.open ("h7.bin", ios::out | ios::binary);
+        outcoef8.open ("h8.bin", ios::out | ios::binary);
+        outcoef9.open ("h9.bin", ios::out | ios::binary);
+        outcoef10.open ("h10.bin", ios::out | ios::binary);
+        outcoef11.open ("h11.bin", ios::out | ios::binary);
+        outcoef12.open ("h12.bin", ios::out | ios::binary);
+        outcoef13.open ("h13.bin", ios::out | ios::binary);
+        outcoef14.open ("h14.bin", ios::out | ios::binary);
+        outcoef15.open ("h15.bin", ios::out | ios::binary);
+
+
+        nxs.open ("nx.bin", ios::in|ios::binary);
+        nys.open ("ny.bin", ios::in|ios::binary);
+        nzs.open ("nz.bin", ios::in|ios::binary);
+
+        if (!nxs.is_open() || !nys.is_open() || !nzs.is_open())
+         {
+            return;
+        }
+
+    } // Known normals
 
     qDebug() << "type " << type;
     // loop over APA pixel blocks
@@ -911,7 +947,10 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
 
                        for(int uu=0;uu<3;uu++)
                                 dirs[k][uu]=dirs[k][uu]/nofa;
+
+                       qDebug()<< sqrt(  dirs[k][0]*dirs[k][0]+dirs[k][1]*dirs[k][1]+dirs[k][2]*dirs[k][2]) << "allora?";
                     }
+
 
 
                 // 8 bit
@@ -1202,6 +1241,11 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                         b_l=Mat::zeros(nimg,1,CV_32FC1);
                     }
 
+                    if(ui->fitterMenu->currentIndex()==5){//hsh 16
+                        L_uv=Mat::zeros(nimg,16,DataType<float>::type);
+                        b_l=Mat::zeros(nimg,1,CV_32FC1);
+                    }
+
                     if(ui->fitterMenu->currentIndex()==0) {// standard PTM
 
                         for (int k=0; k<nimg;k++){
@@ -1268,6 +1312,77 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                         }
                     }
 
+                    if(ui->fitterMenu->currentIndex()==5) {// HSH + normals (wang)
+
+                        // load normals from binary files stored
+                        nxs.read(reinterpret_cast<char*>(&norload[0]), sizeof(float));
+                        nys.read(reinterpret_cast<char*>(&norload[1]), sizeof(float));
+                        nzs.read(reinterpret_cast<char*>(&norload[2]), sizeof(float));
+
+                      // qDebug() << norload[0] << " " << norload[1] << " "  << norload[2];
+                           for (int k=0; k<nimg;k++){
+                               dirsr[k][0] = dirs[k][0];
+                               dirsr[k][1] = dirs[k][1];
+                               dirsr[k][2] = dirs[k][2];
+                              double kv[3], nl[3];
+                              if(norload[2] < 1){
+                              kv[0] = -norload[1]/sqrt((double)(norload[0]*norload[0]+norload[1]*norload[1]));
+                              kv[1] = norload[0]/sqrt((double)(norload[0]*norload[0]+norload[1]*norload[1]));
+
+                              double cost = norload[2];
+                              double sent = sqrt(1-cost*cost);
+   
+                              // qDebug() << k << " dirz " << dirs[k][0] << " " << dirs[k][1] << " " <<  dirs[k][2];
+                                double e0[3]; double e1[3];
+
+                                e0[0] = (cost + kv[0]*kv[0]*(1-cost) );
+                                e0[1] =  kv[0]*kv[1]*(1-cost);
+                                e0[2] =  -kv[1]*sent;
+
+                                e1[0] = (kv[0]*kv[1]*(1-cost)) ;
+                                e1[1] = (cost + kv[1]*kv[1]*(1-cost));
+                                e1[2] =  kv[0]*sent;
+
+                                nl[2] = dirs[k][0]*norload[0] + dirs[k][1]*norload[1] + dirs[k][2]*norload[2];
+                                nl[0] = dirs[k][0]* e0[0] + dirs[k][1] * e0[1] + dirs[k][2]* e0[2];
+                                nl[1] = dirs[k][0]* e1[0] + dirs[k][1] * e1[1] + dirs[k][2]* e1[2];
+
+
+                             //  qDebug()  <<  norload[0] *(cost + kv[0]*kv[0]*(1-cost) ) + norload[1] + dirs[k][2]*norload[2];
+
+                               // qDebug()  << sqrt( dirs[k][0]*dirs[k][0] +  dirs[k][1]*dirs[k][1] + dirs[k][2]*dirs[k][2])  << "check " << sqrt(nl[0]*nl[0] +  nl[1]*nl[1] + nl[2]*nl[2]) ;
+
+                                dirsr[k][0] = nl[0];
+                                dirsr[k][1] = nl[1];
+                                dirsr[k][2] = nl[2];
+                                }
+
+
+
+                        }
+
+                        for (int k=0; k<nimg;k++){
+                            float theta=acos(sqrt(1-pow( dirsr[k][0] ,2) - pow( dirsr[k][1], 2) )); //angle theta
+                            float phi=atan2(dirsr[k][0],dirsr[k][1]);
+                            float hweights[16];
+                            float chweights[16];
+
+                            getHSH(theta, phi, hweights, 3);
+
+                            for(int t=0;t<16;t++){
+                                L_uv.at<float>(k,t)=hweights[t];
+                                //qDebug() << chweights[t];
+                            }
+
+                            if(type==2)
+                                b_l.at<float>(k)= vals[k]/256.0;
+                            else if(type==1)
+                                b_l.at<float>(k)= (float)valc[k];
+                        }
+
+
+                    }
+
 
                 }
                 else if( ui->robustMenu->currentIndex()==1 ){  // Trimmed
@@ -1287,7 +1402,7 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                         b_l=Mat::zeros(ninl,1,CV_32FC1);
                     }
 
-                    if(ui->fitterMenu->currentIndex()==3){//hsh 16
+                    if(ui->fitterMenu->currentIndex()==3 || ui->fitterMenu->currentIndex()==5){//hsh 16
                         L_uv=Mat::zeros(ninl,16,DataType<float>::type);
                         b_l=Mat::zeros(ninl,1,CV_32FC1);
                     }
@@ -1347,7 +1462,7 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                             }
                     }
                     //
-                    if(ui->fitterMenu->currentIndex()==3) {// HSH
+                    if(ui->fitterMenu->currentIndex()==3 || ui->fitterMenu->currentIndex()==5) {// HSH wang
                         for (int k=0; k<nimg-8;k++){
                             float theta=acos(sqrt(1-pow( dirs[idx[k]][0] ,2) - pow( dirs[idx[k]][1] ,2) )); //angle theta
                             float phi=atan2(dirs[idx[k]][0],dirs[idx[k]][1]);
@@ -1366,7 +1481,7 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                         }
                     }
                     if(ui->fitterMenu->currentIndex()==4) {}// DMD
-                    if(ui->fitterMenu->currentIndex()==5) {}// 3 order ptm
+
                 }
 
                 else if(ui->robustMenu->currentIndex()==3 ){ // TEST: removed vs relighted
@@ -1696,7 +1811,7 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
 
 
                 }
-                else if(ui->fitterMenu->currentIndex()==3){ //HSH 16
+                else if(ui->fitterMenu->currentIndex()==3 || ui->fitterMenu->currentIndex()==5){ //HSH 16
 
                     //relight
                     double reva;
@@ -1764,7 +1879,7 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
 
                 } ////
 
-                else if(ui->fitterMenu->currentIndex()==4){ // HSH 9?
+                else if(ui->fitterMenu->currentIndex()==4){ //
 
                 }
 
@@ -1884,6 +1999,78 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                                     else if(type==3)
                                         b_l.at<float>(k)= (float)valc[k];
                                 }
+                            }
+
+                            if(ui->fitterMenu->currentIndex()==5) {// HSH + normals (wang)
+
+                                // load normals from binary files stored
+                                nxs.read(reinterpret_cast<char*>(&norload[0]), sizeof(float));
+                                nys.read(reinterpret_cast<char*>(&norload[1]), sizeof(float));
+                                nzs.read(reinterpret_cast<char*>(&norload[2]), sizeof(float));
+
+                              // qDebug() << norload[0] << " " << norload[1] << " "  << norload[2];
+                                   for (int k=0; k<nimg;k++){
+                                       dirsr[k][0] = dirs[k][0];
+                                       dirsr[k][1] = dirs[k][1];
+                                       dirsr[k][2] = dirs[k][2];
+                                      double kv[3], nl[3];
+                                      if(norload[2] < 1){
+                                      kv[0] = -norload[1]/sqrt((double)(norload[0]*norload[0]+norload[1]*norload[1]));
+                                      kv[1] = norload[0]/sqrt((double)(norload[0]*norload[0]+norload[1]*norload[1]));
+
+                                      double cost = norload[2];
+                                      double sent = sqrt(1-cost*cost);
+
+                                      // qDebug() << k << " dirz " << dirs[k][0] << " " << dirs[k][1] << " " <<  dirs[k][2];
+                                        double e0[3]; double e1[3];
+
+                                        e0[0] = (cost + kv[0]*kv[0]*(1-cost) );
+                                        e0[1] =  kv[0]*kv[1]*(1-cost);
+                                        e0[2] =  -kv[1]*sent;
+
+                                        e1[0] = (kv[0]*kv[1]*(1-cost)) ;
+                                        e1[1] = (cost + kv[1]*kv[1]*(1-cost));
+                                        e1[2] =  kv[0]*sent;
+
+                                        nl[2] = dirs[k][0]*norload[0] + dirs[k][1]*norload[1] + dirs[k][2]*norload[2];
+                                        nl[0] = dirs[k][0]* e0[0] + dirs[k][1] * e0[1] + dirs[k][2]* e0[2];
+                                        nl[1] = dirs[k][0]* e1[0] + dirs[k][1] * e1[1] + dirs[k][2]* e1[2];
+
+
+                                     //  qDebug()  <<  norload[0] *(cost + kv[0]*kv[0]*(1-cost) ) + norload[1] + dirs[k][2]*norload[2];
+
+                                       // qDebug()  << sqrt( dirs[k][0]*dirs[k][0] +  dirs[k][1]*dirs[k][1] + dirs[k][2]*dirs[k][2])  << "check " << sqrt(nl[0]*nl[0] +  nl[1]*nl[1] + nl[2]*nl[2]) ;
+
+                                        dirsr[k][0] = nl[0];
+                                        dirsr[k][1] = nl[1];
+                                        dirsr[k][2] = nl[2];
+                                        }
+
+
+
+                                }
+
+                                for (int k=0; k<nimg;k++){
+                                    float theta=acos(sqrt(1-pow( dirsr[k][0] ,2) - pow( dirsr[k][1], 2) )); //angle theta
+                                    float phi=atan2(dirsr[k][0],dirsr[k][1]);
+                                    float hweights[16];
+                                    float chweights[16];
+
+                                    getHSH(theta, phi, hweights, 3);
+
+                                    for(int t=0;t<16;t++){
+                                        L_uv.at<float>(k,t)=hweights[t];
+                                        //qDebug() << chweights[t];
+                                    }
+
+                                    if(type==2)
+                                        b_l.at<float>(k)= vals[k]/256.0;
+                                    else if(type==1)
+                                        b_l.at<float>(k)= (float)valc[k];
+                                }
+
+
+
                             }
 
                         }
@@ -2309,10 +2496,6 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                             float phi=atan2(dirs[kk][0],dirs[kk][1]);
                             float hweights[16];
                             getHSH(theta, phi, hweights, 3);
-
-                           // if(i==100 || i==1450)
-                             //   qDebug() << hweights[0] << " " << hweights[0] << " " << hweights[1] << " " << hweights[2] << " " << hweights[3] << " " << hweights[4] << " " << hweights[5] << " ";
-                                //qDebug() << j << " -- " << theta << " " << phi;
 
                             if(ui->robustMenu->currentIndex()==3){
                                 reva = 0;
@@ -2876,6 +3059,7 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
             imwrite("outlim.png",outlim);
             imwrite("residual.png",test);
 
+            /*
             for(int i=0; i<him.cols; i+=21)
                 for(int j=0; j<him.rows; j+=21){
                     cv::Rect roi(i,j,20, 20);
@@ -2886,6 +3070,7 @@ cv:Mat image = cv::imread(chroma_img.toStdString(), CV_LOAD_IMAGE_COLOR);
                     //pRoi.setTo(cv::Scalar(blue, green, red));
                     //image_roi2.copyTo( image_roi );
                 }
+            */
         }
 
     }
@@ -4726,4 +4911,15 @@ void apTool::on_resampleButton_clicked()
 void apTool::on_viewBox_activated(const QString &arg1)
 {
 
+}
+
+void apTool::on_zoomButton_clicked()
+{
+     iw->zoomInAct->triggered();
+}
+
+
+void apTool::on_unzoomButton_clicked()
+{
+     iw->zoomOutAct->triggered();
 }
